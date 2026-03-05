@@ -73,6 +73,7 @@ export function useDatabase() {
   const [ricariche,  setRicariche]  = useState({});
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
+  const [codAutisti, setCodAutisti] = useState([]);
 
   // ── LOAD ALL ────────────────────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -88,6 +89,7 @@ export function useDatabase() {
         ]);
         // Palmari: API dedicata (aggiunta con electron_ipc_patch.js)
         const ePalm = await eCall("getPalmari") || [];
+        const eCodAut = await eCall("getCodAutisti") || [];
 
         // ── Il DB è la fonte di verità ────────────────────────────────────
         // Il localStorage viene usato SOLO come fallback se il DB non ha dati.
@@ -97,11 +99,13 @@ export function useDatabase() {
         const lsConts = lsGet("gls_conteggi",   []);
         const lsMezzi = lsGet("gls_mezzi",       []);
         const lsPalm  = lsGet("gls_palmari",     []);
+        const lsCodAut = lsGet("gls_cod_autisti", []);
 
         setPadroncini(ePads.length  > 0 ? ePads  : lsPads);
         setConteggi  (eConts.length > 0 ? eConts : lsConts);
         setMezzi     (eMezzi.length > 0 ? eMezzi : lsMezzi);
         setPalmari   (ePalm.length  > 0 ? ePalm  : lsPalm);
+        setCodAutisti(eCodAut.length > 0 ? eCodAut : lsCodAut);
 
       } else {
         // Modalità browser / dev: solo localStorage
@@ -109,6 +113,7 @@ export function useDatabase() {
         setConteggi(lsGet("gls_conteggi",     []));
         setMezzi(lsGet("gls_mezzi",           []));
         setPalmari(lsGet("gls_palmari",        []));
+        setCodAutisti(lsGet("gls_cod_autisti", []));
       }
 
       setRicariche(await loadRicaricheStorage());
@@ -174,6 +179,27 @@ export function useDatabase() {
     setPalmari(prev => { const next = prev.filter(p => p.id !== id); lsSet("gls_palmari", next); return next; });
   }, []);
 
+  // ── CODICI FLOTTA ──────────────────────────────────────────────────────────
+  const saveCodAutista = useCallback(async (a) => {
+    try { await eCall("saveCodAutista", a); } catch (e) { console.error("[saveCodAutista]", e); }
+    setCodAutisti(prev => {
+      const next = prev.some(x => x.id === a.id)
+        ? prev.map(x => x.id === a.id ? a : x)
+        : [...prev, a];
+      lsSet("gls_cod_autisti", next);
+      return next;
+    });
+  }, []);
+
+  const deleteCodAutista = useCallback(async (id) => {
+    try { await eCall("deleteCodAutista", id); } catch {}
+    setCodAutisti(prev => {
+      const next = prev.filter(a => a.id !== id);
+      lsSet("gls_cod_autisti", next);
+      return next;
+    });
+  }, []);
+
   // ── CONTEGGI ────────────────────────────────────────────────────────────────
   const saveConteggio = useCallback(async (c) => {
     try { await eCall("saveConteggio", c); } catch (e) { console.error("[saveConteggio]", e); }
@@ -207,11 +233,12 @@ export function useDatabase() {
   }, [ricariche]);
 
   return {
-    padroncini, conteggi, mezzi, palmari, ricariche, loading, error,
+    padroncini, conteggi, mezzi, palmari,codAutisti, ricariche, loading, error,
     savePadroncino, deletePadroncino,
     saveConteggio, deleteConteggio,
     saveMezzo, deleteMezzo,
     savePalmare, deletePalmare,
+    saveCodAutista, deleteCodAutista,
     saveRicaricheMese,
     reload: loadAll,
   };
