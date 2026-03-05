@@ -227,8 +227,28 @@ function runMigrations() {
    ["modello_custom","TEXT DEFAULT ''"],
   ].forEach(([c,d]) => addColumnIfMissing("palmari_flotta", c, d));
 
+
+  db.exec(`CREATE TABLE IF NOT EXISTS cod_autisti (
+    id            TEXT PRIMARY KEY,
+    codice        TEXT DEFAULT '',
+    stato         TEXT DEFAULT 'DISPONIBILE',
+    padroncino_id TEXT DEFAULT '',
+    note          TEXT DEFAULT '',
+    storico       TEXT DEFAULT '[]',
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now'))
+  )`);
+  [
+    ["codice",        "TEXT DEFAULT ''"],
+    ["stato",         "TEXT DEFAULT 'DISPONIBILE'"],
+    ["padroncino_id", "TEXT DEFAULT ''"],
+    ["note",          "TEXT DEFAULT ''"],
+    ["storico",       "TEXT DEFAULT '[]'"],
+  ].forEach(([c,d]) => addColumnIfMissing("cod_autisti", c, d));
+
   db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
 }
+
 
 // ─── JSON HELPERS ─────────────────────────────────────────────────────────────
 const JSON_FIELDS_PADRONCINI = [
@@ -243,6 +263,7 @@ const JSON_FIELDS_CONTEGGI = [
 ];
 const JSON_FIELDS_MEZZI    = ["documenti","storico"];
 const JSON_FIELDS_PALMARI  = ["documenti","storico"];
+const JSON_FIELDS_COD_AUTISTI = ["storico"];
 
 function parseRow(row, jsonFields) {
   if (!row) return null;
@@ -434,6 +455,26 @@ function deletePalmare(id) {
   db.prepare("DELETE FROM palmari_flotta WHERE id=?").run(id);
 }
 
+function getAllCodAutisti() {
+  return db.prepare("SELECT * FROM cod_autisti ORDER BY codice").all()
+    .map(r => parseRow(r, JSON_FIELDS_COD_AUTISTI));
+}
+
+function upsertCodAutista(a) {
+  const stato = (a.padroncino_id && a.padroncino_id !== "")
+    ? (a.stato === "DISPONIBILE" ? "ASSEGNATO" : (a.stato || "ASSEGNATO"))
+    : (a.stato === "ASSEGNATO" ? "DISPONIBILE" : (a.stato || "DISPONIBILE"));
+  const withStato = { ...a, stato };
+  const row = stringifyForDb({ ...withStato, updated_at: new Date().toISOString() }, JSON_FIELDS_COD_AUTISTI);
+  const cols = Object.keys(row).filter(k => k !== "id");
+  db.prepare(`INSERT INTO cod_autisti (id,${cols.join(",")}) VALUES (@id,${cols.map(c=>"@"+c).join(",")})
+    ON CONFLICT(id) DO UPDATE SET ${cols.map(c=>`${c}=excluded.${c}`).join(",\n")}`).run(row);
+}
+
+function deleteCodAutistaDb(id) {
+  db.prepare("DELETE FROM cod_autisti WHERE id=?").run(id);
+}
+
 function getSetting(key) {
   const row = db.prepare("SELECT value FROM settings WHERE key=?").get(key);
   return row ? row.value : null;
@@ -487,6 +528,10 @@ function registerIpcHandlers() {
   ipcMain.handle("db:getPalmari",       ()      => getAllPalmari());
   ipcMain.handle("db:savePalmare",      (_,p)   => { upsertPalmare(p); return {ok:true}; });
   ipcMain.handle("db:deletePalmare",    (_,id)  => { deletePalmare(id); return {ok:true}; });
+
+  ipcMain.handle("db:getCodAutisti",    ()     => getAllCodAutisti());
+  ipcMain.handle("db:saveCodAutista",   (_,a)  => { upsertCodAutista(a); return {ok:true}; });
+  ipcMain.handle("db:deleteCodAutista", (_,id) => { deleteCodAutistaDb(id); return {ok:true}; });
 
   ipcMain.handle("db:getRicariche",     ()          => getRicariche());
   ipcMain.handle("db:saveRicariche",    (_,data)    => { saveRicariche(data); return {ok:true}; });

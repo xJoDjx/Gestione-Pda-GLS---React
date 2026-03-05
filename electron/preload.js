@@ -29,6 +29,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   savePalmare:     (p)   => ipcRenderer.invoke("db:savePalmare",     p),
   deletePalmare:   (id)  => ipcRenderer.invoke("db:deletePalmare",   id),
 
+  // ── Codici Autisti ─────────────────────────────────────────────────────────
+  getCodAutisti:    ()   => ipcRenderer.invoke("db:getCodAutisti"),
+  saveCodAutista:   (a)  => ipcRenderer.invoke("db:saveCodAutista",   a),
+  deleteCodAutista: (id) => ipcRenderer.invoke("db:deleteCodAutista", id),
+
   // ── Ricariche ──────────────────────────────────────────────────────────────
   getRicariche:    ()     => ipcRenderer.invoke("db:getRicariche"),
   saveRicariche:   (data) => ipcRenderer.invoke("db:saveRicariche",  data),
