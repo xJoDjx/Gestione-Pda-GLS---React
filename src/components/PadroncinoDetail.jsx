@@ -393,12 +393,32 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
 };
 
 // ─── TAB CODICI AUTISTI ───────────────────────────────────────────────────────
-const TabAutisti = ({ autisti, onChange }) => {
+const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista, onAutoSave, padroncino_id = "" }) => {
   const rows = autisti || [];
+  const [showPicker, setShowPicker] = useState(false);
+
+  const codiciUsati = new Set(rows.map(a => a.codice).filter(Boolean));
+  const disponibili = codAutistiFlotta.filter(a =>
+    (a.stato === "DISPONIBILE" || a.padroncino_id === padroncino_id) &&
+    a.codice && !codiciUsati.has(a.codice)
+  );
 
   const update = (i, field, val) => {
-    if (field === "__DELETE__") { onChange(rows.filter((_, idx) => idx !== i)); return; }
-    if (field === "__ADD__")    { onChange([...rows, { codice: "", tariffa_fissa: 0, tariffa_ritiro: 0, target: 0, data_inizio: "", data_fine: "", doc: null, note: "" }]); return; }
+    if (field === "__DELETE__") {
+      const rimosso = rows[i];
+      const newRows = rows.filter((_, idx) => idx !== i);
+      onChange(newRows);
+      if (onSaveCodAutista && rimosso?.codice) {
+        const globale = codAutistiFlotta.find(f => f.codice === rimosso.codice);
+        if (globale) onSaveCodAutista({ ...globale, stato: "DISPONIBILE", padroncino_id: "" });
+      }
+      if (onAutoSave) onAutoSave(newRows, "codici_autisti");
+      return;
+    }
+    if (field === "__ADD__") {
+      onChange([...rows, { codice: "", tariffa_fissa: 0, tariffa_ritiro: 0, target: 0, data_inizio: "", data_fine: "", doc: null, note: "" }]);
+      return;
+    }
     onChange(rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
   };
 
@@ -407,15 +427,15 @@ const TabAutisti = ({ autisti, onChange }) => {
       <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #e2e8f0" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: 100 }} />{/* Codice */}
-            <col style={{ width: 105 }} />{/* Tariffa fissa */}
-            <col style={{ width: 105 }} />{/* Tariffa ritiro */}
-            <col style={{ width: 90 }} />{/* Target */}
-            <col style={{ width: 90 }} />{/* Bonus/Malus */}
-            <col style={{ width: 100 }} />{/* Inizio */}
-            <col style={{ width: 100 }} />{/* Fine */}
-            <col style={{ width: 70 }} />{/* Doc */}
-            <col />{/* Note */}
+            <col style={{ width: 100 }} />
+            <col style={{ width: 105 }} />
+            <col style={{ width: 105 }} />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 70 }} />
+            <col />
             <col style={{ width: 44 }} />
           </colgroup>
           <thead>
@@ -469,20 +489,13 @@ const TabAutisti = ({ autisti, onChange }) => {
                 </TD>
                 <TD center>
                   {a.doc ? (
-                    <div style={{ display: "flex", gap: 3, justifyContent: "center" }}>
-                      <button onClick={() => window.open(a.doc.data)} style={{ fontSize: 10, background: "#eff6ff", border: "none", borderRadius: 4, padding: "2px 5px", color: "#1d4ed8", cursor: "pointer" }}>Apri</button>
-                      <button onClick={() => update(i, "doc", null)} style={{ fontSize: 10, background: "#fee2e2", border: "none", borderRadius: 4, padding: "2px 5px", color: "#dc2626", cursor: "pointer" }}>✕</button>
-                    </div>
+                    <button onClick={() => window.open(a.doc.data)} title="Apri doc"
+                      style={{ padding: "3px 7px", borderRadius: 5, background: "#eff6ff", border: "none", color: "#1d4ed8", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>PDF</button>
                   ) : (
                     <label style={{ cursor: "pointer" }}>
-                      <span style={{ fontSize: 10, background: "#f1f5f9", border: "1px dashed #cbd5e1", borderRadius: 4, padding: "2px 6px", color: "#64748b" }}>+ doc</span>
-                      <input type="file" accept=".pdf,.jpg,.png" style={{ display: "none" }}
-                        onChange={e => {
-                          const file = e.target.files[0]; if (!file) return;
-                          const r = new FileReader();
-                          r.onload = ev => update(i, "doc", { name: file.name, data: ev.target.result, type: file.type });
-                          r.readAsDataURL(file);
-                        }} />
+                      <span style={{ padding: "3px 7px", borderRadius: 5, background: "#f1f5f9", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: 10 }}>+</span>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }}
+                        onChange={e => { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = ev => update(i, "doc", { name: file.name, data: ev.target.result }); r.readAsDataURL(file); }} />
                     </label>
                   )}
                 </TD>
@@ -490,18 +503,66 @@ const TabAutisti = ({ autisti, onChange }) => {
                   <input value={a.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..."
                     onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
                 </TD>
-                <TD center><DelBtn onClick={() => update(i, "__DELETE__")} /></TD>
+                <TD center>
+                  <button onClick={() => update(i, "__DELETE__")}
+                    style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 5, padding: "4px 6px", cursor: "pointer" }}>
+                    <Icon name="x" size={12} />
+                  </button>
+                </TD>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={9} style={{ padding: 20, textAlign: "center", color: "#94a3b8", fontSize: 12 }}>Nessun autista. Clicca "+ Aggiungi"</td></tr>
+              <tr><td colSpan={10} style={{ textAlign: "center", padding: "18px", color: "#94a3b8", fontSize: 12 }}>Nessun codice autista — Clicca "+ Aggiungi"</td></tr>
             )}
           </tbody>
         </table>
       </div>
-      <button onClick={() => update(0, "__ADD__")} style={{ marginTop: 10, padding: "7px 14px", borderRadius: 8, background: "#fef3c7", border: "1px dashed #fcd34d", color: "#92400e", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-        <Icon name="plus" size={12} /> Aggiungi Autista
-      </button>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+        <button onClick={() => update(0, "__ADD__")}
+          style={{ padding: "7px 14px", borderRadius: 8, background: "#fffbeb", border: "1px dashed #fcd34d", color: "#92400e", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+          <Icon name="plus" size={12} /> Aggiungi Manuale
+        </button>
+        {disponibili.length > 0 && (
+          <button onClick={() => setShowPicker(v => !v)}
+            style={{ padding: "7px 14px", borderRadius: 8, background: "#fef3c7", border: "1px dashed #fcd34d", color: "#78350f", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+            <Icon name="users" size={12} /> Da Flotta ({disponibili.length} disponibili)
+          </button>
+        )}
+      </div>
+
+      {showPicker && disponibili.length > 0 && (
+        <div style={{ marginTop: 10, background: "#fffbeb", borderRadius: 10, border: "1px solid #fcd34d", padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Seleziona dalla Flotta Codici Autisti
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {disponibili.map(a => (
+              <button key={a.id} onClick={() => {
+                const newRows = [...rows, {
+                  codice:         a.codice,
+                  tariffa_fissa:  a.tariffa_fissa  || 0,
+                  tariffa_ritiro: a.tariffa_ritiro || 0,
+                  target:         a.target         || 0,
+                  bonus_malus:    0,
+                  data_inizio:    new Date().toISOString().slice(0, 10),
+                  data_fine:      "",
+                  note:           a.note || "",
+                  doc:            null,
+                }];
+                onChange(newRows);
+                if (onSaveCodAutista) onSaveCodAutista({ ...a, stato: "ASSEGNATO", padroncino_id });
+                if (onAutoSave) onAutoSave(newRows, "codici_autisti");
+                setShowPicker(false);
+              }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #fcd34d", color: "#78350f", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
+                <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{a.codice}</span>
+                {a.tariffa_fissa > 0 && <span style={{ color: "#166534", fontSize: 11 }}>€{a.tariffa_fissa}/fissa</span>}
+                {a.note && <span style={{ color: "#94a3b8", fontSize: 11 }}>{a.note.slice(0, 20)}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
