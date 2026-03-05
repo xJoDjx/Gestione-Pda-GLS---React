@@ -543,7 +543,7 @@ const DocBlock = ({ label, docKey, form, update, accent }) => {
 };
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export const PadroncinoDetail = ({ padroncino, conteggi, onBack, onSave, onSaveConteggio, onLogChange, mezziFlotta = [], palmariFlotta = [], onSaveMezzoFlotta, onSavePalmare }) => {
+export const PadroncinoDetail = ({ padroncino, conteggi, onBack, onSave, onSaveConteggio, onLogChange, mezziFlotta = [], palmariFlotta = [], onSaveMezzoFlotta, onSavePalmare, codAutistiFlotta = [], onSaveCodAutista }) => {
   const [tab, setTab]     = useState("anagrafica");
   const [form, setForm]   = useState({ ...padroncino });
   const [dirty, setDirty] = useState(false);
@@ -769,7 +769,20 @@ export const PadroncinoDetail = ({ padroncino, conteggi, onBack, onSave, onSaveC
       {/* AUTISTI */}
       {tab === "autisti" && (
         <SectionCard title="Codici Autisti" icon="users" accent="#f59e0b">
-          <TabAutisti autisti={form.codici_autisti} onChange={vals => update("codici_autisti", vals)} />
+          <TabAutisti
+            autisti={form.codici_autisti}
+            onChange={vals => update("codici_autisti", vals)}
+            codAutistiFlotta={codAutistiFlotta}
+            onSaveCodAutista={onSaveCodAutista}
+            padroncino_id={form.id}
+            onAutoSave={(vals, campo) => {
+              const updated = { ...formRef.current, [campo]: vals };
+              formRef.current = updated;
+              setForm(updated);
+              setDirty(false);
+              onSave(updated);
+            }}
+          />
         </SectionCard>
       )}
 

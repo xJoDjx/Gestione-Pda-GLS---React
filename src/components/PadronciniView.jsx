@@ -4,23 +4,33 @@ import { Badge } from "./BaseComponents";
 import { PadroncinoDetail } from "./PadroncinoDetail";
 import { euro, durcColor, dvrColor, statoColor, durcDaysLeft } from "../utils/formatters";
 
-export const PadronciniView = ({ padroncini, conteggi, mezzi = [], palmariGlobali = [], onSave, onSaveConteggio, onSaveMezzo, onDelete, onAddNew, onLogChange }) => {
+// FIX BUG #1: detailPad deriva sempre dai padroncini freschi tramite ID
+// In questo modo quando onSavePalmare aggiorna lo stato del palmare nella lista globale,
+// il componente di dettaglio vede subito i dati aggiornati senza dover richiudere/riaprire.
+
+export const PadronciniView = ({ padroncini, conteggi, mezzi = [], palmariGlobali = [], codAutistiGlobali = [], onSave, onSaveConteggio, onSaveMezzo, onDelete, onAddNew, onLogChange, onSaveCodAutista }) => {
   const [search, setSearch] = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
-  const [detailPad, setDetailPad] = useState(null);
+  // FIX: salviamo solo l'ID, non l'oggetto — così è sempre fresco dai props
+  const [detailPadId, setDetailPadId] = useState(null);
+
+  const detailPad = detailPadId ? padroncini.find(p => p.id === detailPadId) : null;
 
   if (detailPad) {
     return (
       <PadroncinoDetail
         padroncino={detailPad}
         conteggi={conteggi}
-        onBack={() => setDetailPad(null)}
-        onSave={(updatedPad) => { onSave(updatedPad); setDetailPad(updatedPad); }}
+        onBack={() => setDetailPadId(null)}
+        onSave={(updatedPad) => { onSave(updatedPad); }}
         onSaveConteggio={onSaveConteggio}
         onLogChange={onLogChange}
         mezziFlotta={mezzi}
         palmariFlotta={palmariGlobali}
         onSaveMezzoFlotta={onSaveMezzo}
+        onSavePalmare={onSavePalmare}
+        codAutistiFlotta={codAutistiGlobali}
+        onSaveCodAutista={onSaveCodAutista}
       />
     );
   }
@@ -77,13 +87,18 @@ export const PadronciniView = ({ padroncini, conteggi, mezzi = [], palmariGlobal
                   onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa"}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{p.nome}</div>
-                    {p.note_varie && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.note_varie}</div>}
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{p.nome}</div>
                   </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", fontSize: 12, fontFamily: "'DM Mono', monospace", color: "#475569" }}>{p.codice}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}><Badge label={p.stato} color={sc.text} bg={sc.bg} /></td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}><Badge label={p.durc_stato || "—"} color={dc.text} bg={dc.bg} border={dc.border} /></td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}><Badge label={p.dvr_stato || "—"} color={dv.text} bg={dv.bg} border={dv.border} /></td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#64748b" }}>{p.codice || "—"}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                    <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color }}>{p.stato || "—"}</span>
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                    <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: dc.bg, color: dc.color }}>{p.durc_stato || "—"}</span>
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                    <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: dv.bg, color: dv.color }}>{p.dvr_stato || "—"}</span>
+                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", fontSize: 12, color: days !== null && days < 30 ? "#dc2626" : "#374151", fontWeight: days !== null && days < 30 ? 700 : 400 }}>
                     {p.durc_scadenza || "—"}{days !== null && days < 30 && days > 0 ? ` (${days}gg)` : ""}
                   </td>
@@ -98,7 +113,7 @@ export const PadronciniView = ({ padroncini, conteggi, mezzi = [], palmariGlobal
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9", fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 600 }}>{euro(fattTot)}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #f1f5f9" }}>
-                    <button onClick={() => setDetailPad(p)}
+                    <button onClick={() => setDetailPadId(p.id)}
                       style={{ padding: "5px 12px", borderRadius: 7, background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", fontSize: 12, fontWeight: 600, cursor: "pointer", marginRight: 6 }}>
                       Dettaglio
                     </button>
