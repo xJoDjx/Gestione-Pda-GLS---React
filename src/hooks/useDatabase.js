@@ -55,8 +55,6 @@ const loadRicaricheStorage = async () => {
 };
 
 // ─── Electron API safe caller ─────────────────────────────────────────────────
-// Chiama window.electronAPI[method] solo se esiste, altrimenti restituisce null.
-// Evita errori runtime quando un metodo non è ancora esposto dal preload.
 const eCall = async (method, ...args) => {
   if (isElectron && typeof window.electronAPI[method] === "function") {
     return await window.electronAPI[method](...args);
@@ -66,14 +64,14 @@ const eCall = async (method, ...args) => {
 
 // ─── HOOK PRINCIPALE ──────────────────────────────────────────────────────────
 export function useDatabase() {
-  const [padroncini, setPadroncini] = useState([]);
-  const [mezzi,      setMezzi]      = useState([]);
-  const [palmari,    setPalmari]    = useState([]);
-  const [conteggi,   setConteggi]   = useState([]);
-  const [ricariche,  setRicariche]  = useState({});
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
-  const [codAutisti, setCodAutisti] = useState([]);
+  const [padroncini,  setPadroncini]  = useState([]);
+  const [mezzi,       setMezzi]       = useState([]);
+  const [palmari,     setPalmari]     = useState([]);
+  const [codAutisti,  setCodAutisti]  = useState([]);
+  const [conteggi,    setConteggi]    = useState([]);
+  const [ricariche,   setRicariche]   = useState({});
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
 
   // ── LOAD ALL ────────────────────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -87,33 +85,27 @@ export function useDatabase() {
           window.electronAPI.getConteggi(),
           window.electronAPI.getMezzi(),
         ]);
-        // Palmari: API dedicata (aggiunta con electron_ipc_patch.js)
-        const ePalm = await eCall("getPalmari") || [];
-        const eCodAut = await eCall("getCodAutisti") || [];
+        const ePalm     = await eCall("getPalmari")     || [];
+        const eCodAut   = await eCall("getCodAutisti")  || [];
 
-        // ── Il DB è la fonte di verità ────────────────────────────────────
-        // Il localStorage viene usato SOLO come fallback se il DB non ha dati.
-        // NON facciamo mai merge DB←localStorage: il localStorage può avere
-        // dati obsoleti (es. padroncino_id:'') che sovrascriverebbero quelli corretti.
-        const lsPads  = lsGet("gls_padroncini", []);
-        const lsConts = lsGet("gls_conteggi",   []);
-        const lsMezzi = lsGet("gls_mezzi",       []);
-        const lsPalm  = lsGet("gls_palmari",     []);
-        const lsCodAut = lsGet("gls_cod_autisti", []);
+        const lsPads    = lsGet("gls_padroncini",   []);
+        const lsConts   = lsGet("gls_conteggi",     []);
+        const lsMezzi   = lsGet("gls_mezzi",        []);
+        const lsPalm    = lsGet("gls_palmari",      []);
+        const lsCodAut  = lsGet("gls_cod_autisti",  []);
 
-        setPadroncini(ePads.length  > 0 ? ePads  : lsPads);
-        setConteggi  (eConts.length > 0 ? eConts : lsConts);
-        setMezzi     (eMezzi.length > 0 ? eMezzi : lsMezzi);
-        setPalmari   (ePalm.length  > 0 ? ePalm  : lsPalm);
-        setCodAutisti(eCodAut.length > 0 ? eCodAut : lsCodAut);
+        setPadroncini (ePads.length    > 0 ? ePads    : lsPads);
+        setConteggi   (eConts.length   > 0 ? eConts   : lsConts);
+        setMezzi      (eMezzi.length   > 0 ? eMezzi   : lsMezzi);
+        setPalmari    (ePalm.length    > 0 ? ePalm    : lsPalm);
+        setCodAutisti (eCodAut.length  > 0 ? eCodAut  : lsCodAut);
 
       } else {
-        // Modalità browser / dev: solo localStorage
-        setPadroncini(lsGet("gls_padroncini", []));
-        setConteggi(lsGet("gls_conteggi",     []));
-        setMezzi(lsGet("gls_mezzi",           []));
-        setPalmari(lsGet("gls_palmari",        []));
-        setCodAutisti(lsGet("gls_cod_autisti", []));
+        setPadroncini (lsGet("gls_padroncini",  []));
+        setConteggi   (lsGet("gls_conteggi",    []));
+        setMezzi      (lsGet("gls_mezzi",       []));
+        setPalmari    (lsGet("gls_palmari",     []));
+        setCodAutisti (lsGet("gls_cod_autisti", []));
       }
 
       setRicariche(await loadRicaricheStorage());
@@ -142,7 +134,7 @@ export function useDatabase() {
   const deletePadroncino = useCallback(async (id) => {
     try { await eCall("deletePadroncino", id); } catch {}
     setPadroncini(prev => { const next = prev.filter(p => p.id !== id); lsSet("gls_padroncini", next); return next; });
-    setConteggi(prev  => { const next = prev.filter(c => c.padroncino_id !== id); lsSet("gls_conteggi", next); return next; });
+    setConteggi(prev   => { const next = prev.filter(c => c.padroncino_id !== id); lsSet("gls_conteggi", next); return next; });
   }, []);
 
   // ── MEZZI ───────────────────────────────────────────────────────────────────
@@ -179,7 +171,7 @@ export function useDatabase() {
     setPalmari(prev => { const next = prev.filter(p => p.id !== id); lsSet("gls_palmari", next); return next; });
   }, []);
 
-  // ── CODICI FLOTTA ──────────────────────────────────────────────────────────
+  // ── COD AUTISTI FLOTTA ──────────────────────────────────────────────────────
   const saveCodAutista = useCallback(async (a) => {
     try { await eCall("saveCodAutista", a); } catch (e) { console.error("[saveCodAutista]", e); }
     setCodAutisti(prev => {
@@ -193,11 +185,7 @@ export function useDatabase() {
 
   const deleteCodAutista = useCallback(async (id) => {
     try { await eCall("deleteCodAutista", id); } catch {}
-    setCodAutisti(prev => {
-      const next = prev.filter(a => a.id !== id);
-      lsSet("gls_cod_autisti", next);
-      return next;
-    });
+    setCodAutisti(prev => { const next = prev.filter(a => a.id !== id); lsSet("gls_cod_autisti", next); return next; });
   }, []);
 
   // ── CONTEGGI ────────────────────────────────────────────────────────────────
@@ -211,13 +199,8 @@ export function useDatabase() {
     });
   }, []);
 
-  // Elimina un conteggio dal DB e dallo stato
   const deleteConteggio = useCallback(async (c) => {
-    try {
-      await eCall("deleteConteggio", c.padroncino_id, c.mese, c.anno);
-    } catch (e) {
-      console.error("[deleteConteggio] electron:", e);
-    }
+    try { await eCall("deleteConteggio", c.padroncino_id, c.mese, c.anno); } catch (e) { console.error("[deleteConteggio]", e); }
     setConteggi(prev => {
       const next = prev.filter(x => cKey(x) !== cKey(c));
       lsSet("gls_conteggi", next);
@@ -233,12 +216,12 @@ export function useDatabase() {
   }, [ricariche]);
 
   return {
-    padroncini, conteggi, mezzi, palmari,codAutisti, ricariche, loading, error,
-    savePadroncino, deletePadroncino,
-    saveConteggio, deleteConteggio,
-    saveMezzo, deleteMezzo,
-    savePalmare, deletePalmare,
-    saveCodAutista, deleteCodAutista,
+    padroncini, conteggi, mezzi, palmari, codAutisti, ricariche, loading, error,
+    savePadroncino,  deletePadroncino,
+    saveConteggio,   deleteConteggio,
+    saveMezzo,       deleteMezzo,
+    savePalmare,     deletePalmare,
+    saveCodAutista,  deleteCodAutista,
     saveRicaricheMese,
     reload: loadAll,
   };
