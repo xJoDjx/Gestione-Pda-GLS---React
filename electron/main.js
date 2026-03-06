@@ -512,35 +512,43 @@ function createWindow() {
 
 // ─── IPC ──────────────────────────────────────────────────────────────────────
 function registerIpcHandlers() {
-  ipcMain.handle("db:getPadroncini",    ()      => getAllPadroncini());
-  ipcMain.handle("db:savePadroncino",   (_,p)   => { upsertPadroncino(p); return {ok:true}; });
-  ipcMain.handle("db:deletePadroncino", (_,id)  => { deletePadroncino(id); return {ok:true}; });
+  // ── Padroncini ──────────────────────────────────────────────────────────────
+  ipcMain.handle("get-padroncini",    ()      => getAllPadroncini());
+  ipcMain.handle("save-padroncino",   (_,p)   => { upsertPadroncino(p); return {ok:true}; });
+  ipcMain.handle("delete-padroncino", (_,id)  => { deletePadroncino(id); return {ok:true}; });
 
-  ipcMain.handle("db:getConteggi",      ()      => getAllConteggi());
-  ipcMain.handle("db:saveConteggio",    (_,c)   => { upsertConteggio(c); return {ok:true}; });
-  ipcMain.handle("db:deleteConteggio",  (_,{padroncino_id,mese,anno}) => {
-    deleteConteggio(padroncino_id,mese,anno); return {ok:true};
-  });
+  // ── Conteggi ────────────────────────────────────────────────────────────────
+  ipcMain.handle("get-conteggi",      ()              => getAllConteggi());
+  ipcMain.handle("save-conteggio",    (_,c)           => { upsertConteggio(c); return {ok:true}; });
+  ipcMain.handle("delete-conteggio",  (_,pid,mese,anno) => { deleteConteggio(pid,mese,anno); return {ok:true}; });
 
-  ipcMain.handle("db:getMezzi",         ()      => getAllMezzi());
-  ipcMain.handle("db:saveMezzo",        (_,m)   => { upsertMezzo(m); return {ok:true}; });
-  ipcMain.handle("db:deleteMezzo",      (_,id)  => { deleteMezzo(id); return {ok:true}; });
+  // ── Mezzi ────────────────────────────────────────────────────────────────────
+  ipcMain.handle("get-mezzi",         ()      => getAllMezzi());
+  ipcMain.handle("save-mezzo",        (_,m)   => { upsertMezzo(m); return {ok:true}; });
+  ipcMain.handle("delete-mezzo",      (_,id)  => { deleteMezzo(id); return {ok:true}; });
 
-  ipcMain.handle("db:getPalmari",       ()      => getAllPalmari());
-  ipcMain.handle("db:savePalmare",      (_,p)   => { upsertPalmare(p); return {ok:true}; });
-  ipcMain.handle("db:deletePalmare",    (_,id)  => { deletePalmare(id); return {ok:true}; });
+  // ── Palmari ──────────────────────────────────────────────────────────────────
+  ipcMain.handle("get-palmari",       ()      => getAllPalmari());
+  ipcMain.handle("save-palmare",      (_,p)   => { upsertPalmare(p); return {ok:true}; });
+  ipcMain.handle("delete-palmare",    (_,id)  => { deletePalmare(id); return {ok:true}; });
 
-  ipcMain.handle("db:getCodAutisti",    ()     => getAllCodAutisti());
-  ipcMain.handle("db:saveCodAutista",   (_,a)  => { upsertCodAutista(a); return {ok:true}; });
-  ipcMain.handle("db:deleteCodAutista", (_,id) => { deleteCodAutistaDb(id); return {ok:true}; });
+  // ── Cod Autisti ──────────────────────────────────────────────────────────────
+  ipcMain.handle("get-cod-autisti",    ()     => getAllCodAutisti());
+  ipcMain.handle("save-cod-autista",   (_,a)  => { upsertCodAutista(a); return {ok:true}; });
+  ipcMain.handle("delete-cod-autista", (_,id) => { deleteCodAutistaDb(id); return {ok:true}; });
 
-  ipcMain.handle("db:getRicariche",     ()          => getRicariche());
-  ipcMain.handle("db:saveRicariche",    (_,data)    => { saveRicariche(data); return {ok:true}; });
-  ipcMain.handle("db:getSettings",      (_,key)     => getSetting(key));
-  ipcMain.handle("db:saveSettings",     (_,key,val) => { setSetting(key,val); return {ok:true}; });
-  ipcMain.handle("db:getDbPath",        ()          => getDbPath());
+  // ── Ricariche ────────────────────────────────────────────────────────────────
+  // Il preload passa (mese, anno) in get e (mese, anno, data) in save → ignoriamo
+  // mese/anno perché le ricariche sono salvate come unico JSON nel settings
+  ipcMain.handle("get-ricariche",        ()              => getRicariche());
+  ipcMain.handle("save-ricariche-mese",  (_,mese,anno,data) => { saveRicariche(data); return {ok:true}; });
 
-  ipcMain.handle("db:changeDbPath", async () => {
+  // ── Impostazioni ─────────────────────────────────────────────────────────────
+  ipcMain.handle("get-setting",  (_,key)     => getSetting(key));
+  ipcMain.handle("set-setting",  (_,key,val) => { setSetting(key,val); return {ok:true}; });
+  ipcMain.handle("get-db-path",  ()          => getDbPath());
+
+  ipcMain.handle("change-db-path", async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Seleziona cartella database",
       properties: ["openDirectory"],
