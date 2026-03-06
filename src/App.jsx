@@ -418,83 +418,74 @@ const AppInner = () => {
               onAddNew={handleAddNew}
               onLogChange={(nuovoForm, tipo, vecchioForm) => {
                 const LABEL = {
-                  nome: "Ragione Sociale", codice: "Codice GLS", stato: "Stato",
-                  partita_iva: "Partita IVA", codice_fiscale: "Codice Fiscale",
-                  telefono: "Telefono", email: "Email", sede_legale: "Sede Legale",
-                  via_sede_legale: "Via Sede", rappresentante: "Rappresentante",
-                  durc_scadenza: "Scad. DURC", durc_stato: "Stato DURC",
-                  dvr_stato: "Stato DVR", dvr_scadenza: "Scad. DVR", note_varie: "Note varie",
+                  nome:            "Ragione Sociale",
+                  codice:          "Codice GLS",
+                  stato:           "Stato",
+                  partita_iva:     "Partita IVA",
+                  codice_fiscale:  "Codice Fiscale",
+                  telefono:        "Telefono",
+                  email:           "Email",
+                  sede_legale:     "Sede Legale",
+                  via_sede_legale: "Via Sede",
+                  rappresentante:  "Rappresentante",
+                  durc_scadenza:   "Scad. DURC",
+                  durc_stato:      "Stato DURC",
+                  dvr_stato:       "Stato DVR",
+                  dvr_scadenza:    "Scad. DVR",
+                  note_varie:      "Note varie",
                 };
-                const campi = Object.entries(LABEL).reduce((acc, [k, label]) => {
+
+                const campi = [];
+
+                // ── Campi anagrafica scalari ─────────────────────────────────────────────
+                Object.entries(LABEL).forEach(([k, label]) => {
                   const da = String(vecchioForm?.[k] ?? "");
                   const a  = String(nuovoForm?.[k]  ?? "");
-                  if (da !== a) acc.push({ label, da: da || "—", a: a || "—" });
-                  return acc;
-                }, []);
+                  if (da !== a) campi.push({ label, da: da || "—", a: a || "—" });
+                });
 
-                // PALMARI — aggiunti/rimossi/modificati
+                // ── Documenti principali (presenza/assenza) ──────────────────────────────
+                [
+                  ["doc_contratto", "Contratto"],
+                  ["doc_durc",      "Doc DURC"],
+                  ["doc_dvr",       "Doc DVR"],
+                  ["visura_doc",    "Visura camerale"],
+                ].forEach(([k, label]) => {
+                  const aveva = !!(vecchioForm?.[k]?.data || vecchioForm?.[k]?.data_b64 || vecchioForm?.[k]);
+                  const ha    = !!(nuovoForm?.[k]?.data   || nuovoForm?.[k]?.data_b64   || nuovoForm?.[k]);
+                  if (aveva !== ha)
+                    campi.push({ label, da: aveva ? "✅ Presente" : "—", a: ha ? "✅ Caricato" : "Rimosso" });
+                });
+
+                // ── Palmari aggiunti/rimossi ─────────────────────────────────────────────
                 const palOld = (vecchioForm?.palmari || []).map(p => p.seriale).filter(Boolean);
                 const palNew = (nuovoForm?.palmari   || []).map(p => p.seriale).filter(Boolean);
-                palNew.filter(s => !palOld.includes(s)).forEach(s =>
-                  campi.push({ label: "Palmare aggiunto", da: "—", a: s }));
-                palOld.filter(s => !palNew.includes(s)).forEach(s =>
-                  campi.push({ label: "Palmare rimosso", da: s, a: "—" }));
-                (nuovoForm?.palmari || []).forEach(pN => {
-                  const pO = (vecchioForm?.palmari || []).find(x => x.seriale === pN.seriale);
-                  if (!pO) return;
-                  if (String(pO.tariffa_mensile ?? "") !== String(pN.tariffa_mensile ?? ""))
-                    campi.push({ label: `Palmare ${pN.seriale} — Tariffa`, da: `€${pO.tariffa_mensile||0}`, a: `€${pN.tariffa_mensile||0}` });
-                  if (String(pO.stato ?? "") !== String(pN.stato ?? ""))
-                    campi.push({ label: `Palmare ${pN.seriale} — Stato`, da: pO.stato || "—", a: pN.stato || "—" });
-                  if (String(pO.data_inizio ?? "") !== String(pN.data_inizio ?? ""))
-                    campi.push({ label: `Palmare ${pN.seriale} — Data inizio`, da: pO.data_inizio || "—", a: pN.data_inizio || "—" });
-                  if (String(pO.data_fine ?? "") !== String(pN.data_fine ?? ""))
-                    campi.push({ label: `Palmare ${pN.seriale} — Data fine`, da: pO.data_fine || "—", a: pN.data_fine || "—" });
-                });
+                palNew.filter(s => !palOld.includes(s))
+                  .forEach(s => campi.push({ label: "Palmare aggiunto", da: "—", a: s }));
+                palOld.filter(s => !palNew.includes(s))
+                  .forEach(s => campi.push({ label: "Palmare rimosso", da: s, a: "—" }));
 
-                // MEZZI — aggiunti/rimossi/modificati
+                // ── Mezzi aggiunti/rimossi ───────────────────────────────────────────────
                 const mOld = (vecchioForm?.mezzi || []).map(m => m.targa).filter(Boolean);
                 const mNew = (nuovoForm?.mezzi   || []).map(m => m.targa).filter(Boolean);
-                mNew.filter(t => !mOld.includes(t)).forEach(t =>
-                  campi.push({ label: "Mezzo aggiunto", da: "—", a: t }));
-                mOld.filter(t => !mNew.includes(t)).forEach(t =>
-                  campi.push({ label: "Mezzo rimosso", da: t, a: "—" }));
-                (nuovoForm?.mezzi || []).forEach(mN => {
-                  const mO = (vecchioForm?.mezzi || []).find(x => x.targa === mN.targa);
-                  if (!mO) return;
-                  if (String(mO.tariffa_mensile ?? "") !== String(mN.tariffa_mensile ?? ""))
-                    campi.push({ label: `Mezzo ${mN.targa} — Tariffa`, da: `€${mO.tariffa_mensile||0}`, a: `€${mN.tariffa_mensile||0}` });
-                  if (String(mO.rata_noleggio ?? "") !== String(mN.rata_noleggio ?? ""))
-                    campi.push({ label: `Mezzo ${mN.targa} — Rata noleggio`, da: `€${mO.rata_noleggio||0}`, a: `€${mN.rata_noleggio||0}` });
-                  if (String(mO.stato ?? "") !== String(mN.stato ?? ""))
-                    campi.push({ label: `Mezzo ${mN.targa} — Stato`, da: mO.stato || "—", a: mN.stato || "—" });
-                });
+                mNew.filter(t => !mOld.includes(t))
+                  .forEach(t => campi.push({ label: "Mezzo aggiunto", da: "—", a: t }));
+                mOld.filter(t => !mNew.includes(t))
+                  .forEach(t => campi.push({ label: "Mezzo rimosso", da: t, a: "—" }));
 
-                // CODICI AUTISTI — aggiunti/rimossi/modificati
+                // ── Autisti aggiunti/rimossi ─────────────────────────────────────────────
                 const aOld = (vecchioForm?.codici_autisti || []).map(a => a.codice).filter(Boolean);
                 const aNew = (nuovoForm?.codici_autisti   || []).map(a => a.codice).filter(Boolean);
-                aNew.filter(c => !aOld.includes(c)).forEach(c =>
-                  campi.push({ label: "Codice autista aggiunto", da: "—", a: c }));
-                aOld.filter(c => !aNew.includes(c)).forEach(c =>
-                  campi.push({ label: "Codice autista rimosso", da: c, a: "—" }));
-                (nuovoForm?.codici_autisti || []).forEach(aN => {
-                  const aO = (vecchioForm?.codici_autisti || []).find(x => x.codice === aN.codice);
-                  if (!aO) return;
-                  if (String(aO.tariffa_fissa ?? "") !== String(aN.tariffa_fissa ?? ""))
-                    campi.push({ label: `Autista ${aN.codice} — Tariffa fissa`, da: `€${aO.tariffa_fissa||0}`, a: `€${aN.tariffa_fissa||0}` });
-                  if (String(aO.tariffa_ritiro ?? "") !== String(aN.tariffa_ritiro ?? ""))
-                    campi.push({ label: `Autista ${aN.codice} — Tariffa ritiro`, da: `€${aO.tariffa_ritiro||0}`, a: `€${aN.tariffa_ritiro||0}` });
-                  if (String(aO.target ?? "") !== String(aN.target ?? ""))
-                    campi.push({ label: `Autista ${aN.codice} — Target`, da: String(aO.target||0), a: String(aN.target||0) });
-                  if (String(aO.note ?? "") !== String(aN.note ?? ""))
-                    campi.push({ label: `Autista ${aN.codice} — Note`, da: aO.note || "—", a: aN.note || "—" });
-                });
+                aNew.filter(c => !aOld.includes(c))
+                  .forEach(c => campi.push({ label: "Autista aggiunto", da: "—", a: c }));
+                aOld.filter(c => !aNew.includes(c))
+                  .forEach(c => campi.push({ label: "Autista rimosso", da: c, a: "—" }));
 
                 const entry = {
-                  tipo:   campi.length > 0 ? tipo : (tipo || "Salvataggio"),
+                  tipo:    campi.length > 0 ? (tipo || "Modifica") : (tipo || "Salvataggio"),
                   campi,
-                  utente: currentUser?.nome || currentUser?.username || "Sistema",
-                  ts:     new Date().toISOString(),
+                  utente:  currentUser?.nome || currentUser?.username || "Sistema",
+                  ts:      new Date().toISOString(),
                 };
                 const updated = { ...nuovoForm, cronologia: [...(nuovoForm.cronologia || []), entry] };
                 handleSavePadroncino(updated);
