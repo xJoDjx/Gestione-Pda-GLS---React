@@ -5,6 +5,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path  = require("path");
 const fs    = require("fs");
+const { shell } = require("electron");
 
 // ─── SETTINGS STORE ──────────────────────────────────────────────────────────
 // Salva in %APPDATA%/<appName>/gls-settings.json
@@ -565,6 +566,33 @@ function registerIpcHandlers() {
     store.set("dbPath", newPath);
     openDb();
     return newPath;
+  });
+
+    // ─── APRI FILE CON APP NATIVA (salva base64 su temp + apri) ───────────────
+  ipcMain.handle("open-file", async (_, { data, nome }) => {
+    const os   = require("os");
+    const path = require("path");
+    const fs   = require("fs");
+    const base64  = data.replace(/^data:[^;]+;base64,/, "");
+    const buf     = Buffer.from(base64, "base64");
+    const tmpDir  = path.join(os.tmpdir(), "gls_docs");
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, nome);
+    fs.writeFileSync(tmpPath, buf);
+    const err = await shell.openPath(tmpPath);
+    if (err) throw new Error(err);
+    return { ok: true };
+  });
+
+    // ─── SALVA FILE (download) ──────────────────────────────────────────────
+  ipcMain.handle("save-file", async (_, { data, nome }) => {
+    const { dialog } = require("electron");
+    const fs         = require("fs");
+    const { filePath } = await dialog.showSaveDialog({ defaultPath: nome });
+    if (!filePath) return { cancelled: true };
+    const base64 = data.replace(/^data:[^;]+;base64,/, "");
+    fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
+    return { ok: true };
   });
 }
 

@@ -1,49 +1,43 @@
-// ═══════════════════════════════════════════════════════════════════════════════
-// preload.js  —  Electron preload (contextIsolation: true)
-// Espone window.electronAPI al renderer in modo sicuro tramite contextBridge.
-// Ogni metodo corrisponde a un handler ipcMain.handle("db:...") in main.js
-// ═══════════════════════════════════════════════════════════════════════════════
-
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  // ── Padroncini ────────────────────────────────────────────────────────────
+  getPadroncini:    ()  => ipcRenderer.invoke("get-padroncini"),
+  savePadroncino:   (p) => ipcRenderer.invoke("save-padroncino",  p),
+  deletePadroncino: (id)=> ipcRenderer.invoke("delete-padroncino",id),
 
-  // ── Padroncini ─────────────────────────────────────────────────────────────
-  getPadroncini:   ()    => ipcRenderer.invoke("db:getPadroncini"),
-  savePadroncino:  (p)   => ipcRenderer.invoke("db:savePadroncino",  p),
-  deletePadroncino:(id)  => ipcRenderer.invoke("db:deletePadroncino",id),
+  // ── Conteggi ──────────────────────────────────────────────────────────────
+  getConteggi:      ()  => ipcRenderer.invoke("get-conteggi"),
+  saveConteggio:    (c) => ipcRenderer.invoke("save-conteggio",   c),
+  deleteConteggio:  (pid, mese, anno) => ipcRenderer.invoke("delete-conteggio", pid, mese, anno),
 
-  // ── Conteggi ───────────────────────────────────────────────────────────────
-  getConteggi:     ()    => ipcRenderer.invoke("db:getConteggi"),
-  saveConteggio:   (c)   => ipcRenderer.invoke("db:saveConteggio",   c),
-  deleteConteggio: (padroncino_id, mese, anno) =>
-    ipcRenderer.invoke("db:deleteConteggio", { padroncino_id, mese, anno }),
+  // ── Mezzi ─────────────────────────────────────────────────────────────────
+  getMezzi:         ()  => ipcRenderer.invoke("get-mezzi"),
+  saveMezzo:        (m) => ipcRenderer.invoke("save-mezzo",       m),
+  deleteMezzo:      (id)=> ipcRenderer.invoke("delete-mezzo",     id),
 
-  // ── Mezzi ──────────────────────────────────────────────────────────────────
-  getMezzi:        ()    => ipcRenderer.invoke("db:getMezzi"),
-  saveMezzo:       (m)   => ipcRenderer.invoke("db:saveMezzo",       m),
-  deleteMezzo:     (id)  => ipcRenderer.invoke("db:deleteMezzo",     id),
+  // ── Palmari ───────────────────────────────────────────────────────────────
+  getPalmari:       ()  => ipcRenderer.invoke("get-palmari"),
+  savePalmare:      (p) => ipcRenderer.invoke("save-palmare",     p),
+  deletePalmare:    (id)=> ipcRenderer.invoke("delete-palmare",   id),
 
-  // ── Palmari ────────────────────────────────────────────────────────────────
-  getPalmari:      ()    => ipcRenderer.invoke("db:getPalmari"),
-  savePalmare:     (p)   => ipcRenderer.invoke("db:savePalmare",     p),
-  deletePalmare:   (id)  => ipcRenderer.invoke("db:deletePalmare",   id),
+  // ── Cod Autisti ───────────────────────────────────────────────────────────
+  getCodAutisti:    ()  => ipcRenderer.invoke("get-cod-autisti"),
+  saveCodAutista:   (a) => ipcRenderer.invoke("save-cod-autista", a),
+  deleteCodAutista: (id)=> ipcRenderer.invoke("delete-cod-autista",id),
 
-  // ── Codici Autisti ─────────────────────────────────────────────────────────
-  getCodAutisti:    ()   => ipcRenderer.invoke("db:getCodAutisti"),
-  saveCodAutista:   (a)  => ipcRenderer.invoke("db:saveCodAutista",   a),
-  deleteCodAutista: (id) => ipcRenderer.invoke("db:deleteCodAutista", id),
+  // ── Ricariche ─────────────────────────────────────────────────────────────
+  getRicariche:          (mese, anno) => ipcRenderer.invoke("get-ricariche", mese, anno),
+  saveRicaricheMese:     (mese, anno, data) => ipcRenderer.invoke("save-ricariche-mese", mese, anno, data),
 
-  // ── Ricariche ──────────────────────────────────────────────────────────────
-  getRicariche:    ()     => ipcRenderer.invoke("db:getRicariche"),
-  saveRicariche:   (data) => ipcRenderer.invoke("db:saveRicariche",  data),
+  // ── Impostazioni ──────────────────────────────────────────────────────────
+  getSetting:       (k)     => ipcRenderer.invoke("get-setting",  k),
+  setSetting:       (k, v)  => ipcRenderer.invoke("set-setting",  k, v),
+  getDbPath:        ()      => ipcRenderer.invoke("get-db-path"),
 
-  // ── Settings generici ──────────────────────────────────────────────────────
-  getSettings:     (key)        => ipcRenderer.invoke("db:getSettings",  key),
-  saveSettings:    (key, value) => ipcRenderer.invoke("db:saveSettings", key, value),
-
-  // ── Percorso DB ────────────────────────────────────────────────────────────
-  getDbPath:       ()    => ipcRenderer.invoke("db:getDbPath"),
-  changeDbPath:    ()    => ipcRenderer.invoke("db:changeDbPath"),
-
+  // ── File system ───────────────────────────────────────────────────────────
+  // BUG 4 FIX: apri file con app nativa del SO (PDF con Adobe, immagini con Foto, ecc.)
+  openFile:   (data, nome) => ipcRenderer.invoke("open-file",  { data, nome }),
+  // Salva file su disco tramite dialog "Salva con nome"
+  saveFile:   (data, nome) => ipcRenderer.invoke("save-file",  { data, nome }),
 });
