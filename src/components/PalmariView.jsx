@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Icon } from "./Icons";
 import { euro, durcDaysLeft } from "../utils/formatters";
 
@@ -53,8 +53,9 @@ const buildStorico = (old, neo, pads, utente = "") => {
 };
 
 // ─── DETTAGLIO ────────────────────────────────────────────────────────────────
-const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente="" }) => {
+const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente = "" }) => {
   const [form,      setForm]      = useState({...palmare});
+  const baseline = useRef({ ...palmare });  // FIX 1
   const [tab,       setTab]       = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
   const [notaTesto, setNotaTesto] = useState("");
@@ -70,12 +71,13 @@ const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente="
   };
 
   const handleSave = () => {
-    const log   = buildStorico(palmare, form, padroncini, utente);
-    const saved = {...form, storico:[...storico,...log]};
-    // Stato finale coerente con assegnazione
-    if (saved.padroncino_id && saved.stato==="DISPONIBILE") saved.stato="ASSEGNATO";
-    if (!saved.padroncino_id && saved.stato==="ASSEGNATO")  saved.stato="DISPONIBILE";
-    onSave(saved);
+    const nuoviLog = buildStorico(baseline.current, form, padroncini, utente);
+    const saved = { ...form, storico: [...(form.storico || []), ...nuoviLog] };
+    if (saved.padroncino_id && saved.stato === "DISPONIBILE") saved.stato = "ASSEGNATO";
+    if (!saved.padroncino_id && saved.stato === "ASSEGNATO")  saved.stato = "DISPONIBILE";
+    baseline.current = { ...saved };  // FIX 1: aggiorna punto di riferimento
+    setForm(saved);                   // FIX 2: storico visibile immediatamente
+    onSave(saved, nuoviLog);          // FIX 3: passa nuovi log al parent
   };
 
   const addDoc = () => {
@@ -217,62 +219,104 @@ const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente="
       )}
 
       {/* ═══ STORICO ═══ */}
-      {tab==="storico" && (
-        <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e2e8f0",padding:"20px" }}>
-          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
+      {tab === "storico" && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+          <div style={{ padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9" }}>
             <div>
-              <div style={{ fontSize:13,fontWeight:800,color:"#0f172a" }}>📜 Storico — {form.seriale}</div>
-              <div style={{ fontSize:11,color:"#64748b",marginTop:2 }}>Registra automaticamente ogni modifica</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>📜 Storico — {form.seriale || "—"}</div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{(form.storico || []).length} eventi · aggiornamento in tempo reale</div>
             </div>
-            {storico.length>0&&<button onClick={()=>{if(window.confirm("Cancellare lo storico?"))set("storico",[]);}}
-              style={{ padding:"6px 12px",borderRadius:7,background:"#fee2e2",color:"#dc2626",border:"none",fontSize:11,fontWeight:700,cursor:"pointer" }}>Cancella</button>}
+            {(form.storico || []).length > 0 && (
+              <button onClick={() => { if (window.confirm("Cancellare lo storico?")) { setForm(f => ({...f, storico:[]})); baseline.current = {...baseline.current, storico:[]}; }}}
+                style={{ padding:"6px 12px", borderRadius:7, background:"#fee2e2", color:"#dc2626", border:"none", fontSize:11, fontWeight:700, cursor:"pointer" }}>Cancella</button>
+            )}
           </div>
-          <div style={{ marginBottom:16,padding:"12px 14px",background:"#f8fafc",borderRadius:10,border:"1px dashed #cbd5e1" }}>
-            <div style={{ fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:8 }}>✏️ Nota manuale</div>
-            <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
-              <input value={notaCampo} onChange={e=>setNotaCampo(e.target.value)} placeholder="Tipo (Riparazione, Smarrimento...)"
-                style={{ width:220,padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,background:"#fff" }}/>
-              <input value={notaTesto} onChange={e=>setNotaTesto(e.target.value)} placeholder="Descrizione..."
-                style={{ flex:1,minWidth:200,padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,background:"#fff" }}/>
-              <button onClick={()=>{if(!notaTesto.trim())return;set("storico",[...storico,{ts:new Date().toISOString(),data:new Date().toLocaleDateString("it-IT"),campo:notaCampo.trim()||"Nota manuale",da:"—",a:notaTesto.trim(),manuale:true}]);setNotaCampo("");setNotaTesto("");}}
-                style={{ padding:"6px 16px",borderRadius:7,background:"#6366f1",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer" }}>Aggiungi</button>
+
+          {/* Nota manuale */}
+          <div style={{ padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input value={notaCampo} onChange={e => setNotaCampo(e.target.value)} placeholder="Tipo nota (Smarrimento, Riparazione...)"
+                style={{ width: 210, padding: "6px 10px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 12, background: "#fff" }} />
+              <input value={notaTesto} onChange={e => setNotaTesto(e.target.value)} placeholder="Descrizione nota..."
+                style={{ flex: 1, minWidth: 180, padding: "6px 10px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 12, background: "#fff" }} />
+              <button onClick={() => {
+                if (!notaTesto.trim()) return;
+                const nota = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: notaCampo.trim() || "Nota", da: "—", a: notaTesto.trim(), utente, manuale: true };
+                setForm(f => ({ ...f, storico: [...(f.storico || []), nota] }));
+                setNotaCampo(""); setNotaTesto("");
+              }} style={{ padding: "6px 16px", borderRadius: 7, background: "#6366f1", color: "#fff", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                + Nota
+              </button>
             </div>
           </div>
-          {storico.length===0?(
-            <div style={{ textAlign:"center",padding:"44px 0",color:"#94a3b8" }}>
-              <div style={{ fontSize:36,marginBottom:10 }}>📜</div>
-              <div style={{ fontSize:13 }}>Nessuna modifica ancora registrata</div>
+
+          {(form.storico || []).length === 0 ? (
+            <div style={{ padding: "50px 20px", textAlign: "center", color: "#94a3b8" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📜</div>
+              <div style={{ fontSize: 13 }}>Nessuna modifica registrata</div>
             </div>
-          ):(
-            <div>
-              {[...storico].reverse().map((e,i,arr)=>{
-                const dot=e.manuale?"#8b5cf6":e.campo==="Stato"?"#f59e0b":e.campo==="Padroncino"?"#10b981":"#6366f1";
-                return(
-                  <div key={i} style={{ display:"flex" }}>
-                    <div style={{ display:"flex",flexDirection:"column",alignItems:"center",width:28,flexShrink:0 }}>
-                      <div style={{ width:12,height:12,borderRadius:"50%",background:dot,marginTop:14,boxShadow:`0 0 0 3px ${dot}22` }}/>
-                      {i<arr.length-1&&<div style={{ width:2,flex:1,background:"#f1f5f9",minHeight:16 }}/>}
-                    </div>
-                    <div style={{ flex:1,paddingBottom:16,paddingTop:10 }}>
-                      <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:4 }}>
-                        <span style={{ fontSize:11,fontWeight:800,color:"#374151",textTransform:"uppercase",letterSpacing:"0.05em" }}>{e.campo}</span>
-                        {e.manuale&&<span style={{ fontSize:9,padding:"1px 6px",borderRadius:4,background:"#f5f3ff",color:"#7c3aed",fontWeight:700 }}>MANUALE</span>}
-                        <span style={{ fontSize:11,color:"#94a3b8",marginLeft:"auto" }}>{e.data}</span>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "155px 130px 115px 1fr", background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "8px 16px" }}>
+                {["Data / Ora","Utente","Azione","Descrizione"].map(h => (
+                  <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</div>
+                ))}
+              </div>
+              <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                {[...(form.storico || [])].reverse().map((e, i) => {
+                  const isManuale = e.manuale;
+                  const isPad     = e.campo === "Padroncino";
+                  const isStato   = e.campo === "Stato";
+                  const isDoc     = (e.campo || "").toLowerCase().includes("documento");
+                  const azione    = isManuale ? "Nota" : isPad ? "Assegnazione" : isStato ? "Cambio Stato" : isDoc ? "Documento" : "Modifica";
+                  const acMeta = {
+                    "Nota":         { bg:"#f5f3ff", color:"#6d28d9", dot:"#8b5cf6" },
+                    "Assegnazione": { bg:"#fef3c7", color:"#92400e", dot:"#f59e0b" },
+                    "Cambio Stato": { bg:"#fffbeb", color:"#854d0e", dot:"#f59e0b" },
+                    "Documento":    { bg:"#ecfdf5", color:"#065f46", dot:"#10b981" },
+                    "Modifica":     { bg:"#eff6ff", color:"#1d4ed8", dot:"#3b82f6" },
+                  }[azione] || { bg:"#f1f5f9", color:"#374151", dot:"#94a3b8" };
+
+                  const descrizione = isManuale
+                    ? `${e.campo !== "Nota" ? e.campo + ": " : ""}${e.a}`
+                    : isPad
+                      ? (e.a && e.a !== "—" && e.a !== "Nessuno"
+                          ? `Assegnato al padroncino "${e.a}"`
+                          : `Rimosso dal padroncino "${e.da}"`)
+                      : isDoc
+                        ? (e.campo.includes("aggiunto") ? `Aggiunto: ${e.a}` : `Rimosso: ${e.da}`)
+                        : `${e.campo}: ${e.da || "—"} → ${e.a || "—"}`;
+
+                  const dt = e.ts ? new Date(e.ts) : null;
+                  const dataOra = dt
+                    ? dt.toLocaleDateString("it-IT") + " " + dt.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit", second:"2-digit" })
+                    : (e.data || "—");
+
+                  return (
+                    <div key={i} style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", padding:"9px 16px", borderBottom:"1px solid #f8fafc", background: i%2===0?"#fff":"#fafbfc", alignItems:"center" }}>
+                      <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#64748b", lineHeight:1.4 }}>{dataOra}</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                        {e.utente ? (
+                          <>
+                            <div style={{ width:22, height:22, borderRadius:"50%", background:"#6366f1", color:"#fff", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                              {e.utente[0].toUpperCase()}
+                            </div>
+                            <div style={{ fontSize:11, fontWeight:600, color:"#374151" }}>{e.utente}</div>
+                          </>
+                        ) : <div style={{ fontSize:11, color:"#94a3b8" }}>—</div>}
                       </div>
-                      {e.manuale?(
-                        <div style={{ fontSize:12,color:"#374151",padding:"6px 10px",background:"#f5f3ff",borderRadius:7,borderLeft:"3px solid #8b5cf6" }}>{e.a}</div>
-                      ):(
-                        <div style={{ display:"flex",alignItems:"center",gap:8,flexWrap:"wrap" }}>
-                          <span style={{ fontSize:12,fontFamily:"'DM Mono',monospace",padding:"4px 10px",background:"#f1f5f9",borderRadius:6,color:"#64748b",textDecoration:"line-through" }}>{e.da}</span>
-                          <span style={{ fontSize:16,color:"#cbd5e1" }}>→</span>
-                          <span style={{ fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:"4px 10px",background:"#f0fdf4",borderRadius:6,color:"#166534",border:"1px solid #bbf7d0" }}>{e.a}</span>
-                        </div>
-                      )}
+                      <div>
+                        <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:5, fontSize:10, fontWeight:700, background:acMeta.bg, color:acMeta.color }}>
+                          <span style={{ width:5, height:5, borderRadius:"50%", background:acMeta.dot, display:"inline-block" }} />
+                          {azione}
+                        </span>
+                      </div>
+                      <div style={{ fontSize:12, color:"#374151", wordBreak:"break-word" }}>{descrizione}</div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -333,7 +377,7 @@ export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAdd
         padroncini={padroncini}
         utente={utente}
         onBack={()=>setDetail(null)}
-        onSave={p=>{ onSave(p); setDetail(p); }}
+        onSave={(p, nuoviLog)=>{ onSave(p, nuoviLog); setDetail(p); }}
         onDelete={id=>{ onDelete(id); setDetail(null); }}
       />
     );

@@ -281,16 +281,15 @@ const AppInner = () => {
     notify("Nuovo mezzo creato — " + (categoria === "DISTRIBUZIONE" ? "Distribuzione" : "Auto Aziendale"));
   };
 
-    const handleSaveMezzo = useCallback(async (m, vecchio = null, azione = null) => {
-    const az = azione || (mezzi?.find(x => x.id === m.id) ? "MODIFICA" : "CREA");
-    try {
-      await saveMezzo(m);
-      // Notifica solo se non chiamata in background (es. sync)
-    } catch (e) { console.error("[saveMezzo]", e); throw e; }
+  const handleSaveMezzo = useCallback(async (m, nuoviLog = []) => {
+    const az = mezzi?.find(x => x.id === m.id) ? "MODIFICA" : "CREA";
+    try { await saveMezzo(m); } catch (e) { console.error("[saveMezzo]", e); throw e; }
 
-    const campi = (m.storico || [])
-      .slice(vecchio ? (vecchio.storico || []).length : 0)
-      .map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+    // nuoviLog viene passato direttamente dal componente MezzoDetail
+    // contiene SOLO le voci nuove di questa singola operazione di salvataggio
+    const campi = (nuoviLog || []).map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+
+    if (az === "MODIFICA" && campi.length === 0) return; // nessuna modifica reale
 
     addLogEntry({
       sezione:     "mezzi",
@@ -299,7 +298,9 @@ const AppInner = () => {
       entita_nome: m.targa || m.id,
       descrizione: az === "CREA"
         ? `Creato mezzo "${m.targa || m.id}"`
-        : `Modificato mezzo "${m.targa || m.id}"`,
+        : campi.length === 1
+          ? `Mezzo "${m.targa}": ${campi[0].campo} → ${campi[0].a}`
+          : `Modificato mezzo "${m.targa || m.id}" (${campi.length} campi)`,
       currentUser,
       campi,
     });
@@ -309,31 +310,23 @@ const AppInner = () => {
     const m = mezzi?.find(x => x.id === id);
     await deleteMezzo(id);
     addLogEntry({
-      sezione:     "mezzi",
-      azione:      "ELIMINA",
-      entita_id:   id,
-      entita_nome: m?.targa || id,
+      sezione: "mezzi", azione: "ELIMINA",
+      entita_id: id, entita_nome: m?.targa || id,
       descrizione: `Eliminato mezzo "${m?.targa || id}"`,
       currentUser, campi: [],
     });
   }, [deleteMezzo, mezzi, addLogEntry, currentUser]);
 
-  const handleAddNewPalmare = () => {
-    const p = {
-      id: "PALM_" + Date.now(), seriale: "", modello: "", stato: "DISPONIBILE",
-      padroncino_id: "", tariffa_mensile: 0, data_assegnazione: "", data_fine: "", note: "",
-    };
-    handleSavePalmare(p, null, "CREA");
-    notify("Nuovo palmare creato!");
-  };
 
-  const handleSavePalmare = useCallback(async (p, vecchio = null) => {
+// ── SOSTITUISCI handleSavePalmare ─────────────────────────────────────────────
+
+  const handleSavePalmare = useCallback(async (p, nuoviLog = []) => {
     const az = palmari?.find(x => x.id === p.id) ? "MODIFICA" : "CREA";
     try { await savePalmare(p); } catch (e) { console.error("[savePalmare]", e); throw e; }
 
-    const campi = (p.storico || [])
-      .slice(vecchio ? (vecchio.storico || []).length : 0)
-      .map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+    const campi = (nuoviLog || []).map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+
+    if (az === "MODIFICA" && campi.length === 0) return;
 
     addLogEntry({
       sezione:     "palmari",
@@ -342,7 +335,9 @@ const AppInner = () => {
       entita_nome: p.seriale || p.id,
       descrizione: az === "CREA"
         ? `Creato palmare "${p.seriale || p.id}"`
-        : `Modificato palmare "${p.seriale || p.id}"`,
+        : campi.length === 1
+          ? `Palmare "${p.seriale}": ${campi[0].campo} → ${campi[0].a}`
+          : `Modificato palmare "${p.seriale || p.id}" (${campi.length} campi)`,
       currentUser,
       campi,
     });
@@ -359,23 +354,16 @@ const AppInner = () => {
     });
   }, [deletePalmare, palmari, addLogEntry, currentUser]);
 
-  const handleAddNewCodAutista = () => {
-    const a = {
-      id: "COD_" + Date.now(), codice: "", stato: "DISPONIBILE",
-      padroncino_id: "", note: "", storico: [],
-    };
-    handleSaveCodAutista(a, null, "CREA");
-    notify("Nuovo codice autista creato!");
-  };  
 
-    const handleSaveCodAutista = useCallback(async (a) => {
+// ── SOSTITUISCI handleSaveCodAutista ─────────────────────────────────────────
+
+  const handleSaveCodAutista = useCallback(async (a, nuoviLog = []) => {
     const az = codAutisti?.find(x => x.id === a.id) ? "MODIFICA" : "CREA";
     try { await saveCodAutista(a); } catch (e) { console.error("[saveCodAutista]", e); throw e; }
 
-    const campi = (a.storico || [])
-      .slice(0) // prende tutto perché il componente aggiunge solo le diff
-      .slice(-5) // ultime 5 voci
-      .map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+    const campi = (nuoviLog || []).map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+
+    if (az === "MODIFICA" && campi.length === 0) return;
 
     addLogEntry({
       sezione:     "codici",
@@ -384,7 +372,9 @@ const AppInner = () => {
       entita_nome: a.codice || a.id,
       descrizione: az === "CREA"
         ? `Creato codice autista "${a.codice || a.id}"`
-        : `Modificato codice autista "${a.codice || a.id}"`,
+        : campi.length === 1
+          ? `Codice "${a.codice}": ${campi[0].campo} → ${campi[0].a}`
+          : `Modificato codice autista "${a.codice || a.id}" (${campi.length} campi)`,
       currentUser,
       campi,
     });

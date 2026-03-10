@@ -816,38 +816,114 @@ export const PadroncinoDetail = ({
 
       {/* ══ CRONOLOGIA / LOG ══ */}
       {tab === "cronologia" && (
-        <SectionCard title="Log Modifiche" icon="clock" accent="#8b5cf6">
-          {(form.cronologia || []).length === 0 ? (
-            <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8", fontSize: 13 }}>Nessuna modifica registrata</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {[...(form.cronologia || [])].reverse().map((entry, i, arr) => (
-                <div key={i} style={{ display: "flex", gap: 12, paddingBottom: 16, borderLeft: i < arr.length - 1 ? "2px solid #f1f5f9" : "2px solid transparent", marginLeft: 8, paddingLeft: 16 }}>
-                  <div style={{ position: "absolute", marginLeft: -25, marginTop: 2, width: 12, height: 12, borderRadius: "50%", background: "#8b5cf6", flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{entry.tipo}</span>
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{new Date(entry.ts).toLocaleDateString("it-IT")} {new Date(entry.ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</span>
-                    </div>
-                    {(entry.campi || []).length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                        {entry.campi.map((c, j) => (
-                          <div key={j} style={{ display: "flex", gap: 6, fontSize: 11, alignItems: "center", flexWrap: "wrap" }}>
-                            <span style={{ fontWeight: 700, color: "#64748b", minWidth: 120 }}>{c.label}:</span>
-                            <span style={{ padding: "1px 6px", borderRadius: 4, background: "#fee2e2", color: "#dc2626" }}>{c.da}</span>
-                            <span style={{ color: "#94a3b8" }}>→</span>
-                            <span style={{ padding: "1px 6px", borderRadius: 4, background: "#dcfce7", color: "#166534" }}>{c.a}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {entry.utente && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>da {entry.utente}</div>}
-                  </div>
-                </div>
-              ))}
+        <div style={{ background:"#fff", borderRadius:14, border:"1px solid #e2e8f0", overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+          {/* Header */}
+          <div style={{ padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid #f1f5f9" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:800, color:"#0f172a" }}>📋 Log Modifiche — {form.nome}</div>
+              <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{(form.cronologia||[]).length} eventi · aggiornamento in tempo reale</div>
             </div>
+            {(form.cronologia||[]).length > 0 && (
+              <button onClick={() => { if(window.confirm("Cancellare tutta la cronologia?")) update("cronologia", []); }}
+                style={{ padding:"6px 12px", borderRadius:7, background:"#fee2e2", color:"#dc2626", border:"none", fontSize:11, fontWeight:700, cursor:"pointer" }}>
+                Cancella
+              </button>
+            )}
+          </div>
+
+          {(form.cronologia||[]).length === 0 ? (
+            <div style={{ padding:"50px 20px", textAlign:"center", color:"#94a3b8" }}>
+              <div style={{ fontSize:32, marginBottom:8 }}>📋</div>
+              <div style={{ fontSize:13 }}>Nessuna modifica registrata</div>
+            </div>
+          ) : (
+            <>
+              {/* Intestazioni */}
+              <div style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", background:"#f8fafc", borderBottom:"2px solid #e2e8f0", padding:"8px 16px" }}>
+                {["Data / Ora","Utente","Azione","Descrizione"].map(h => (
+                  <div key={h} style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.07em" }}>{h}</div>
+                ))}
+              </div>
+
+              <div style={{ maxHeight:500, overflowY:"auto" }}>
+                {[...(form.cronologia||[])].reverse().map((entry, i) => {
+                  // Ogni entry della cronologia padroncino ha: {ts, azione, campi:[], utente}
+                  // oppure vecchio formato con campi: [...] e nessun utente
+                  const campi   = Array.isArray(entry.campi) ? entry.campi : [];
+                  const azione  = entry.azione || "Modifica";
+                  const utente  = entry.utente || entry.username || "—";
+                  const dt      = entry.ts ? new Date(entry.ts) : null;
+                  const dataOra = dt
+                    ? dt.toLocaleDateString("it-IT")+" "+dt.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"})
+                    : (entry.data || "—");
+
+                  // Costruisci descrizione dall'azione e dai campi
+                  const azioneDisplay = azione === "CREA" ? "Creazione" : azione === "ELIMINA" ? "Eliminazione" : azione === "MODIFICA" ? "Modifica" : azione;
+                  const acMeta = {
+                    "Creazione":   { bg:"#dcfce7", color:"#166534", dot:"#22c55e" },
+                    "Modifica":    { bg:"#dbeafe", color:"#1d4ed8", dot:"#3b82f6" },
+                    "Eliminazione":{ bg:"#fee2e2", color:"#dc2626", dot:"#ef4444" },
+                  }[azioneDisplay] || { bg:"#f1f5f9", color:"#374151", dot:"#94a3b8" };
+
+                  // Descrizione: usa campi se disponibili, altrimenti usa entry.descrizione
+                  let descrizione = entry.descrizione || "";
+                  if (!descrizione && campi.length > 0) {
+                    descrizione = campi.map(c => `${c.campo}: "${c.da||"—"}" → "${c.a||"—"}"`).join(" · ");
+                  }
+                  if (!descrizione) descrizione = "Nessun dettaglio";
+
+                  return (
+                    <div key={i}>
+                      <div style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", padding:"9px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"#fff":"#fafbfc", alignItems:"start" }}>
+                        {/* Data/Ora */}
+                        <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#64748b", lineHeight:1.4, paddingTop:2 }}>{dataOra}</div>
+
+                        {/* Utente */}
+                        <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                          {utente !== "—" ? (
+                            <>
+                              <div style={{ width:22, height:22, borderRadius:"50%", background:"#8b5cf6", color:"#fff", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                {utente[0].toUpperCase()}
+                              </div>
+                              <div style={{ fontSize:11, fontWeight:600, color:"#374151" }}>{utente}</div>
+                            </>
+                          ) : <div style={{ fontSize:11, color:"#94a3b8" }}>—</div>}
+                        </div>
+
+                        {/* Azione */}
+                        <div style={{ paddingTop:2 }}>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:5, fontSize:10, fontWeight:700, background:acMeta.bg, color:acMeta.color }}>
+                            <span style={{ width:5, height:5, borderRadius:"50%", background:acMeta.dot, display:"inline-block" }} />
+                            {azioneDisplay}
+                          </span>
+                        </div>
+
+                        {/* Descrizione + dettaglio campi */}
+                        <div>
+                          <div style={{ fontSize:12, color:"#374151", wordBreak:"break-word" }}>
+                            {descrizione}
+                          </div>
+                          {campi.length > 1 && (
+                            <div style={{ marginTop:6, display:"flex", flexDirection:"column", gap:3 }}>
+                              {campi.map((c, ci) => (
+                                <div key={ci} style={{ display:"flex", gap:6, alignItems:"center", fontSize:11 }}>
+                                  <span style={{ fontWeight:700, color:"#64748b", minWidth:100 }}>{c.campo}</span>
+                                  <span style={{ background:"#fee2e2", color:"#991b1b", padding:"1px 6px", borderRadius:3, fontFamily:"'DM Mono',monospace", fontSize:10 }}>{c.da||"—"}</span>
+                                  <span style={{ color:"#94a3b8" }}>→</span>
+                                  <span style={{ background:"#dcfce7", color:"#166534", padding:"1px 6px", borderRadius:3, fontFamily:"'DM Mono',monospace", fontSize:10 }}>{c.a||"—"}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
-        </SectionCard>
+        </div>
       )}
 
     </div>
