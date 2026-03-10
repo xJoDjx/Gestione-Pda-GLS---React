@@ -176,23 +176,43 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
               </div>
               <div style={{ borderTop:"1px solid #f1f5f9",paddingTop:10 }}>
                 <div style={{ fontSize:11,color:"#64748b",marginBottom:8,fontWeight:700,textTransform:"uppercase" }}>Voci da PDA / Extra</div>
-                {(form.voci_fatturato||[]).map((voce,vi) => (
-                  <div key={vi} style={{ display:"flex",flexDirection:"column",gap:3,marginBottom:6,background:"#fafafa",borderRadius:8,border:"1px solid #f1f5f9",padding:"7px 9px" }}>
-                    <div style={{ display:"flex",gap:6,alignItems:"center" }}>
-                      <input value={voce.label} onChange={e=>{const a=[...(form.voci_fatturato||[])];a[vi]={...a[vi],label:e.target.value};set("voci_fatturato",a);}}
-                        placeholder="Descrizione voce" style={{ flex:1,padding:"7px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,background:"#fff" }} />
-                      <input type="number" value={voce.val} step="0.01" onChange={e=>{const a=[...(form.voci_fatturato||[])];a[vi]={...a[vi],val:parseFloat(e.target.value)||0};set("voci_fatturato",a);}}
-                        style={{ width:90,padding:"7px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,fontFamily:"'DM Mono',monospace",background:"#fff" }} />
-                      <button onClick={() => set("voci_fatturato",(form.voci_fatturato||[]).filter((_,j)=>j!==vi))}
-                        style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"7px 9px",cursor:"pointer",flexShrink:0 }}>
-                        <Icon name="x" size={12}/>
-                      </button>
+                  {(form.voci_fatturato||[]).length > 0 && (
+                    <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #e2e8f0" }}>
+                      <table style={{ width:"100%",borderCollapse:"collapse" }}>
+                        <colgroup><col/><col style={{ width:90 }}/><col/><col style={{ width:28 }}/></colgroup>
+                        <thead>
+                          <tr style={{ background:"#f8fafc" }}>
+                            {["Etichetta PDA","Valore €","Note",""].map(h=>(
+                              <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(form.voci_fatturato||[]).map((voce,vi)=>(
+                            <tr key={vi} style={{ background:vi%2===0?"#fff":"#fafafa" }}>
+                              <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                                <input value={voce.label} onChange={e=>{const a=[...(form.voci_fatturato||[])];a[vi]={...a[vi],label:e.target.value};set("voci_fatturato",a);}}
+                                  placeholder="Etichetta" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                              </td>
+                              <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                                <input type="number" value={voce.val} step="0.01" onChange={e=>{const a=[...(form.voci_fatturato||[])];a[vi]={...a[vi],val:parseFloat(e.target.value)||0};set("voci_fatturato",a);}}
+                                  style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",boxSizing:"border-box" }} />
+                              </td>
+                              <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                                <input value={voce.note||""} onChange={e=>{const a=[...(form.voci_fatturato||[])];a[vi]={...a[vi],note:e.target.value};set("voci_fatturato",a);}}
+                                  placeholder="note..." style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",boxSizing:"border-box" }} />
+                              </td>
+                              <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
+                                <button onClick={()=>set("voci_fatturato",(form.voci_fatturato||[]).filter((_,j)=>j!==vi))}
+                                  style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <input value={voce.note||""} onChange={e=>{const a=[...(form.voci_fatturato||[])];a[vi]={...a[vi],note:e.target.value};set("voci_fatturato",a);}}
-                      placeholder="Note voce (opzionali)" style={{ padding:"5px 10px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",background:"#fff",outline:"none" }} />
-                  </div>
-                ))}
-                <button onClick={() => set("voci_fatturato",[...(form.voci_fatturato||[]),{label:"",val:0}])}
+                  )}
+                <button onClick={()=>set("voci_fatturato",[...(form.voci_fatturato||[]),{label:"",val:0}])}
                   style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
                   <Icon name="plus" size={13}/> Aggiungi voce PDA
                 </button>
@@ -202,35 +222,51 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
 
           <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
             <SectionCard title="Voci Extra Fatturato" icon="note" accent="#8b5cf6" compact>
-              <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-                {(form.altri_fatturato||[]).map((item,i) => (
-                  <div key={i} style={{ padding:"8px 10px",borderRadius:8,border:"1px solid #e2e8f0",background:"#fafafa",display:"flex",flexDirection:"column",gap:5 }}>
-                    <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                      <input value={item.descrizione} onChange={e=>{const a=[...(form.altri_fatturato||[])];a[i]={...a[i],descrizione:e.target.value};set("altri_fatturato",a);}}
-                        placeholder="Descrizione" style={{ flex:1,padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12 }} />
-                      <input type="number" value={item.importo} step="0.01" onChange={e=>{const a=[...(form.altri_fatturato||[])];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("altri_fatturato",a);}}
-                        style={{ width:90,padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,fontFamily:"'DM Mono',monospace" }} />
-                      <button onClick={() => set("altri_fatturato",(form.altri_fatturato||[]).filter((_,j)=>j!==i))}
-                        style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer" }}>
-                        <Icon name="x" size={12}/>
-                      </button>
-                    </div>
-                    <input value={item.note||""} onChange={e=>{const a=[...(form.altri_fatturato||[])];a[i]={...a[i],note:e.target.value};set("altri_fatturato",a);}}
-                      placeholder="Note (opzionali)" style={{ padding:"5px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",background:"#fff" }} />
-                  </div>
-                ))}
-                <div style={{ display:"flex",gap:8 }}>
-                  <button onClick={() => set("altri_fatturato",[...(form.altri_fatturato||[]),{descrizione:"",importo:0}])}
-                    style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
-                    <Icon name="plus" size={13}/> Aggiungi voce
-                  </button>
-                  {onSaveTemplate && (
-                    <button onClick={onSaveTemplate} style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#ecfdf5",border:"1px solid #86efac",color:"#166534",fontSize:12,cursor:"pointer" }}>
-                      <Icon name="save" size={13}/> Salva template
-                    </button>
-                  )}
+            <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+              {(form.altri_fatturato||[]).length > 0 && (
+                <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #e2e8f0" }}>
+                  <table style={{ width:"100%",borderCollapse:"collapse" }}>
+                    <colgroup><col/><col style={{ width:90 }}/><col/><col style={{ width:28 }}/></colgroup>
+                    <thead>
+                      <tr style={{ background:"#f8fafc" }}>
+                        {["Descrizione","Importo €","Note",""].map(h=>(
+                          <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(form.altri_fatturato||[]).map((item,i)=>(
+                        <tr key={i} style={{ background:i%2===0?"#fff":"#fafafa" }}>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input value={item.descrizione} onChange={e=>{const a=[...(form.altri_fatturato||[])];a[i]={...a[i],descrizione:e.target.value};set("altri_fatturato",a);}}
+                              placeholder="Descrizione" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input type="number" value={item.importo} step="0.01" onChange={e=>{const a=[...(form.altri_fatturato||[])];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("altri_fatturato",a);}}
+                              style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input value={item.note||""} onChange={e=>{const a=[...(form.altri_fatturato||[])];a[i]={...a[i],note:e.target.value};set("altri_fatturato",a);}}
+                              placeholder="note..." style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
+                            <button onClick={()=>set("altri_fatturato",(form.altri_fatturato||[]).filter((_,j)=>j!==i))}
+                              style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+              )}
+              <div style={{ display:"flex",gap:8 }}>
+                <button onClick={()=>set("altri_fatturato",[...(form.altri_fatturato||[]),{descrizione:"",importo:0}])}
+                  style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
+                  <Icon name="plus" size={13}/> Aggiungi voce
+                </button>
+                {/* mantieni qui il bottone template se c'era */}
               </div>
+            </div>
             </SectionCard>
 
             <SectionCard title="Totale Imponibile (Auto)" icon="calculator" accent="#3b82f6" compact>
@@ -277,35 +313,79 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
           {/* Mezzi */}
           <SectionCard title="Mezzi in Noleggio" icon="truck" accent="#ef4444">
             <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-              {(form.dettagli_mezzi||[]).map((m,i) => (
-                <div key={i} style={{ padding:10,borderRadius:8,border:"1px solid #f1f5f9",background:"#fafafa",display:"flex",flexDirection:"column",gap:6 }}>
-                  <div style={{ display:"flex",gap:8,alignItems:"flex-end" }}>
-                    <Input label={i===0?"Targa":""} value={m.targa} onChange={v=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],targa:v};set("dettagli_mezzi",a);}} type="text" small />
-                    <Input label={i===0?"Imp.(€)":""} value={m.importo} onChange={v=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],importo:parseFloat(v)||0,importo_ivato:parseFloat(((parseFloat(v)||0)*1.22).toFixed(2))};set("dettagli_mezzi",a);}} small />
-                    <Input label={i===0?"Tipo":""} value={m.tipologia} onChange={v=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],tipologia:v};set("dettagli_mezzi",a);}} type="text" small />
-                    <button onClick={() => set("dettagli_mezzi",form.dettagli_mezzi.filter((_,j)=>j!==i))}
-                      style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"6px",cursor:"pointer",marginTop:i===0?20:0 }}>
-                      <Icon name="x" size={12}/>
-                    </button>
-                  </div>
-                  <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                    <input value={m.nota||""} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],nota:e.target.value};set("dettagli_mezzi",a);}}
-                      placeholder="Nota (es. rif. fattura, periodo...)"
-                      style={{ flex:1,padding:"5px 8px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",background:"#fff" }} />
-                    <div style={{ fontSize:11,color:"#64748b",whiteSpace:"nowrap" }}>Con IVA: <span style={{ fontFamily:"'DM Mono',monospace",fontWeight:700,color:"#166534" }}>{euro(m.importo_ivato||(m.importo||0)*1.22)}</span></div>
-                  </div>
-                </div>
-              ))}
-              <button onClick={() => set("dettagli_mezzi",[...(form.dettagli_mezzi||[]),{targa:"",importo:0,importo_ivato:0,tipologia:"",nota:""}])}
-                style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
-                <Icon name="plus" size={13}/> Aggiungi mezzo
-              </button>
-              {(form.dettagli_mezzi||[]).length>0 && (
-                <div style={{ display:"flex",justifyContent:"space-between",padding:"8px 10px",background:"#fee2e2",borderRadius:8,fontSize:12,marginTop:4 }}>
-                  <span style={{ fontWeight:700,color:"#dc2626" }}>Totale Mezzi (imponibile)</span>
-                  <span style={{ fontFamily:"'DM Mono',monospace",fontWeight:800,color:"#dc2626" }}>{euro(form.addebiti_mezzi||0)}</span>
+
+              {/* Tabella compatta */}
+              {(form.dettagli_mezzi||[]).length > 0 && (
+                <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #f1f5f9" }}>
+                  <table style={{ width:"100%",borderCollapse:"collapse",tableLayout:"fixed" }}>
+                    <colgroup>
+                      <col style={{ width:90 }} />   {/* Targa */}
+                      <col style={{ width:90 }} />   {/* Imponibile */}
+                      <col style={{ width:100 }} />  {/* Tipologia */}
+                      <col />                         {/* Nota */}
+                      <col style={{ width:90 }} />   {/* Con IVA */}
+                      <col style={{ width:28 }} />   {/* × */}
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background:"#f8fafc" }}>
+                        {["Targa","Imp. €","Tipologia","Nota","Con IVA",""].map(h=>(
+                          <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.05em",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(form.dettagli_mezzi||[]).map((m,i)=>(
+                        <tr key={i} style={{ background:i%2===0?"#fff":"#fafafa" }}>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input value={m.targa} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],targa:e.target.value};set("dettagli_mezzi",a);}}
+                              placeholder="Targa" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:700,boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input type="number" value={m.importo} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],importo:parseFloat(e.target.value)||0,importo_ivato:parseFloat(((parseFloat(e.target.value)||0)*1.22).toFixed(2))};set("dettagli_mezzi",a);}}
+                              style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box",fontFamily:"'DM Mono',monospace" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input value={m.tipologia||""} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],tipologia:e.target.value};set("dettagli_mezzi",a);}}
+                              placeholder="tipo..." style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input value={m.nota||""} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],nota:e.target.value};set("dettagli_mezzi",a);}}
+                              placeholder="nota facoltativa..." style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box",color:"#64748b" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"right" }}>
+                            <span style={{ fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:"#dc2626" }}>
+                              {euro(m.importo_ivato||(m.importo||0)*1.22)}
+                            </span>
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
+                            <button onClick={()=>set("dettagli_mezzi",(form.dettagli_mezzi||[]).filter((_,j)=>j!==i))}
+                              style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
+
+              {/* Bottone aggiungi */}
+              <button onClick={()=>set("dettagli_mezzi",[...(form.dettagli_mezzi||[]),{targa:"",importo:0,importo_ivato:0,tipologia:"",nota:""}])}
+                style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer",alignSelf:"flex-start" }}>
+                <Icon name="plus" size={13}/> Aggiungi mezzo
+              </button>
+
+              {/* Totale */}
+              {(form.dettagli_mezzi||[]).length > 0 && (
+                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:"#fee2e2",borderRadius:8,fontSize:12,marginTop:2 }}>
+                  <span style={{ fontWeight:700,color:"#dc2626" }}>
+                    Totale {(form.dettagli_mezzi||[]).length} mezzi (imponibile)
+                  </span>
+                  <span style={{ fontFamily:"'DM Mono',monospace",fontWeight:800,color:"#dc2626" }}>
+                    {euro(form.addebiti_mezzi||0)}
+                  </span>
+                </div>
+              )}
+
             </div>
           </SectionCard>
 
@@ -399,68 +479,79 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
           {/* Altri addebiti — con note e IVA selezionabile */}
           <SectionCard title="Altri Addebiti" icon="note" accent="#8b5cf6" compact>
             <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
-              {(form.altri_addebiti||[]).map((item,i) => {
-                const rate = item.iva_rate??0.22;
-                const isTemplate = !!item._template_id;
-                return (
-                  <div key={i} style={{ padding:"10px 12px",borderRadius:8,border:`1px solid ${isTemplate?"#c4b5fd":"#f1f5f9"}`,background:isTemplate?"#faf5ff":"#fafafa",display:"flex",flexDirection:"column",gap:7 }}>
-                    {isTemplate && (
-                      <div style={{ fontSize:10,color:"#7c3aed",fontWeight:700,display:"flex",alignItems:"center",gap:4 }}>
-                        📋 Template: {addebiti_standard.find(t=>t.id===item._template_id)?.nome||""}
-                      </div>
-                    )}
-                    {/* Riga principale */}
-                    <div style={{ display:"grid",gridTemplateColumns:"1fr 80px 88px 28px",gap:6,alignItems:"center" }}>
-                      <div style={{ display:"flex",flexDirection:"column",gap:3 }}>
-                        {isTemplate ? (
-                          <div style={{ display:"flex",gap:4,alignItems:"center" }}>
-                            <span style={{ fontSize:11,color:"#64748b",background:"#f5f3ff",padding:"4px 8px",borderRadius:6,fontWeight:600,whiteSpace:"nowrap" }}>
-                              {addebiti_standard.find(t=>t.id===item._template_id)?.prefisso||item.descrizione}
-                            </span>
-                            <input value={item._template_variabile||""} onChange={e=>{
-                              const a=[...form.altri_addebiti];
-                              const tpl=addebiti_standard.find(t=>t.id===item._template_id);
-                              const pref=tpl?.prefisso||"";
-                              a[i]={...a[i],_template_variabile:e.target.value,descrizione:(pref+e.target.value).trim()};
-                              set("altri_addebiti",a);
-                            }} placeholder="es. 0008/26"
-                              style={{ flex:1,padding:"4px 8px",borderRadius:6,border:"1px solid #c4b5fd",fontSize:12,background:"#fff",fontFamily:"'DM Mono',monospace" }} />
-                          </div>
-                        ) : (
-                          <input value={item.descrizione} onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],descrizione:e.target.value};set("altri_addebiti",a);}}
-                            placeholder="Descrizione" style={{ padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12 }} />
-                        )}
-                      </div>
-                      <input type="number" value={item.importo} step="0.01" onChange={e=>{const v=parseFloat(e.target.value)||0;const a=[...form.altri_addebiti];a[i]={...a[i],importo:v};set("altri_addebiti",a);}}
-                        style={{ padding:"6px 8px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,fontFamily:"'DM Mono',monospace",textAlign:"right" }} />
-                      <IvaSelect value={rate} onChange={v=>{const a=[...form.altri_addebiti];a[i]={...a[i],iva_rate:v};set("altri_addebiti",a);}} />
-                      <button onClick={() => set("altri_addebiti",form.altri_addebiti.filter((_,j)=>j!==i))}
-                        style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"5px 6px",cursor:"pointer" }}>
-                        <Icon name="x" size={11}/>
-                      </button>
-                    </div>
-                    {/* Conto voce (auto da template o editabile) */}
-                    {isTemplate && item.conto_voce && (
-                      <div style={{ fontSize:10,color:"#7c3aed",paddingLeft:2,fontWeight:600 }}>📁 {item.conto_voce}</div>
-                    )}
-                    {!isTemplate && (
-                      <input value={item.conto_voce||""} onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],conto_voce:e.target.value};set("altri_addebiti",a);}}
-                        placeholder="Conto Voce (opzionale)"
-                        style={{ padding:"5px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:11,color:"#7c3aed",background:"#fff" }} />
-                    )}
-                    {/* Campo note */}
-                    <input value={item.note||""} onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],note:e.target.value};set("altri_addebiti",a);}}
-                      placeholder="Note (opzionali)"
-                      style={{ padding:"5px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",background:"#fff" }} />
-                    {/* IVA display */}
-                    {rate>0 && item.importo>0 && (
-                      <div style={{ fontSize:10,color:"#7c3aed",paddingLeft:2 }}>
-                        Con IVA {Math.round(rate*100)}%: <strong style={{ fontFamily:"'DM Mono',monospace" }}>{euro(withIva(item.importo,rate))}</strong>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {(form.altri_addebiti||[]).length > 0 && (
+                <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #e2e8f0" }}>
+                  <table style={{ width:"100%",borderCollapse:"collapse" }}>
+                    <colgroup>
+                      <col/>                          {/* Descrizione */}
+                      <col style={{ width:85 }}/>     {/* Importo */}
+                      <col style={{ width:88 }}/>     {/* IVA */}
+                      <col style={{ width:85 }}/>     {/* Conto voce */}
+                      <col/>                          {/* Note */}
+                      <col style={{ width:28 }}/>     {/* × */}
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background:"#f8fafc" }}>
+                        {["Descrizione","Importo €","IVA","Conto","Note",""].map(h=>(
+                          <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(form.altri_addebiti||[]).map((item,i)=>{
+                        const rate = item.iva_rate ?? 0.22;
+                        const isTemplate = !!item._template_id;
+                        return (
+                          <tr key={i} style={{ background: isTemplate ? "#faf5ff" : i%2===0 ? "#fff" : "#fafafa" }}>
+                            <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                              {isTemplate ? (
+                                <div style={{ display:"flex",gap:4,alignItems:"center" }}>
+                                  <span style={{ fontSize:10,color:"#7c3aed",background:"#ede9fe",padding:"2px 5px",borderRadius:4,fontWeight:700,whiteSpace:"nowrap" }}>
+                                    {addebiti_standard.find(t=>t.id===item._template_id)?.prefisso||item.descrizione}
+                                  </span>
+                                  <input value={item._template_variabile||""} onChange={e=>{
+                                    const a=[...form.altri_addebiti];
+                                    const tpl=addebiti_standard.find(t=>t.id===item._template_id);
+                                    a[i]={...a[i],_template_variabile:e.target.value,descrizione:((tpl?.prefisso||"")+e.target.value).trim()};
+                                    set("altri_addebiti",a);
+                                  }} placeholder="variabile..." style={{ flex:1,padding:"3px 6px",borderRadius:5,border:"1px solid #c4b5fd",fontSize:11,boxSizing:"border-box",minWidth:0 }} />
+                                </div>
+                              ) : (
+                                <input value={item.descrizione} onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],descrizione:e.target.value};set("altri_addebiti",a);}}
+                                  placeholder="Descrizione" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                              )}
+                            </td>
+                            <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                              <div style={{ display:"flex",flexDirection:"column",gap:1 }}>
+                                <input type="number" value={item.importo} step="0.01" onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("altri_addebiti",a);}}
+                                  style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",boxSizing:"border-box" }} />
+                                {rate>0 && item.importo>0 && (
+                                  <span style={{ fontSize:9,color:"#7c3aed",fontFamily:"'DM Mono',monospace" }}>+IVA: {euro(withIva(item.importo,rate))}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                              <IvaSelect value={rate} onChange={v=>{const a=[...form.altri_addebiti];a[i]={...a[i],iva_rate:v};set("altri_addebiti",a);}} />
+                            </td>
+                            <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                              <input value={item.conto_voce||""} onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],conto_voce:e.target.value};set("altri_addebiti",a);}}
+                                placeholder="es. 620" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                            </td>
+                            <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                              <input value={item.note||""} onChange={e=>{const a=[...form.altri_addebiti];a[i]={...a[i],note:e.target.value};set("altri_addebiti",a);}}
+                                placeholder="note..." style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",boxSizing:"border-box" }} />
+                            </td>
+                            <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
+                              <button onClick={()=>set("altri_addebiti",(form.altri_addebiti||[]).filter((_,j)=>j!==i))}
+                                style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
                 {addebiti_standard.length>0 && (
                   <select onChange={e=>{
@@ -500,19 +591,39 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
 
           <SectionCard title="Fatture Fine Mese / Altre" icon="note" accent="#10b981">
             <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-              {(form.fatture_fine_mese||[]).map((item,i) => (
-                <div key={i} style={{ display:"flex",gap:8,alignItems:"center" }}>
-                  <input value={item.descrizione} onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],descrizione:e.target.value};set("fatture_fine_mese",a);}}
-                    placeholder="Es. FATTURA FINE MESE 0127/FM" style={{ flex:1,padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12 }} />
-                  <input type="number" value={item.importo} step="0.01" onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("fatture_fine_mese",a);}}
-                    style={{ width:100,padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,fontFamily:"'DM Mono',monospace" }} />
-                  <button onClick={() => set("fatture_fine_mese",form.fatture_fine_mese.filter((_,j)=>j!==i))}
-                    style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"5px 8px",cursor:"pointer" }}>
-                    <Icon name="x" size={12}/>
-                  </button>
+              {(form.fatture_fine_mese||[]).length > 0 && (
+                <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #e2e8f0" }}>
+                  <table style={{ width:"100%",borderCollapse:"collapse" }}>
+                    <colgroup><col/><col style={{ width:100 }}/><col style={{ width:28 }}/></colgroup>
+                    <thead>
+                      <tr style={{ background:"#f8fafc" }}>
+                        {["Descrizione / Rif. Fattura","Importo €",""].map(h=>(
+                          <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(form.fatture_fine_mese||[]).map((item,i)=>(
+                        <tr key={i} style={{ background:i%2===0?"#fff":"#fafafa" }}>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input value={item.descrizione} onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],descrizione:e.target.value};set("fatture_fine_mese",a);}}
+                              placeholder="Es. FATTURA FINE MESE 0127/FM" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                            <input type="number" value={item.importo} step="0.01" onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("fatture_fine_mese",a);}}
+                              style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",boxSizing:"border-box" }} />
+                          </td>
+                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
+                            <button onClick={()=>set("fatture_fine_mese",form.fatture_fine_mese.filter((_,j)=>j!==i))}
+                              style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-              <button onClick={() => set("fatture_fine_mese",[...(form.fatture_fine_mese||[]),{descrizione:"",importo:0}])}
+              )}
+              <button onClick={()=>set("fatture_fine_mese",[...(form.fatture_fine_mese||[]),{descrizione:"",importo:0}])}
                 style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
                 <Icon name="plus" size={13}/> Aggiungi fattura
               </button>
@@ -704,7 +815,7 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
           </div>
 
           {/* ─── COMPENSAZIONI & DEDUZIONI ───────────────────────────── */}
-          {((form.compensazioni_distribuzione||0)!==0||(form.fatture_fine_mese||[]).some(f=>(f.importo||0)>0)||cassaNorm.some(cc=>(cc.importo||0)>0)) && (() => {
+          {((form.compensazioni_distribuzione||0)!==0||(form.fatture_fine_mese||[]).some(f=>(f.importo||0)>0 || f.descrizione)||cassaNorm.some(cc=>(cc.importo||0)>0)) && (() => {
             const totComp=(form.compensazioni_distribuzione||0)
               +((form.fatture_fine_mese||[]).reduce((s,f)=>s+(f.importo||0),0))
               +(cassaNorm.reduce((s,cc)=>s+(cc.importo||0),0));
