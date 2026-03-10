@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setSetting:       (k, v)  => ipcRenderer.invoke("set-setting",  k, v),
   getDbPath:        ()      => ipcRenderer.invoke("get-db-path"),
 
+  // ── Log Storico Globale ────────────────────────────────────────────────────
+  saveLogEntry:  (entry)  => ipcRenderer.invoke("save-log-entry",  entry),
+  getLogEntries: ()       => ipcRenderer.invoke("get-log-entries"),
+
   // ── File system ───────────────────────────────────────────────────────────
   // BUG 4 FIX: apri file con app nativa del SO (PDF con Adobe, immagini con Foto, ecc.)
   openFile:   (data, nome) => ipcRenderer.invoke("open-file",  { data, nome }),

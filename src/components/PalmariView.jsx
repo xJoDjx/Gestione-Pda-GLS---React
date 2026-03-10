@@ -35,7 +35,7 @@ const TRACK = [
   ["stato","Stato"],["padroncino_id","Padroncino"],
   ["tariffa_mensile","Tariffa mensile"],["data_assegnazione","Data assegnazione"],["data_fine","Fine assegnazione"],
 ];
-const buildStorico = (old, neo, pads=[]) => {
+const buildStorico = (old, neo, pads, utente = "") => {
   const ts = new Date().toISOString();
   const data = new Date().toLocaleDateString("it-IT");
   return TRACK.reduce((acc,[k,label])=>{
@@ -47,13 +47,13 @@ const buildStorico = (old, neo, pads=[]) => {
       a  = pads.find(p=>p.id===vn)?.nome||(vn?"—":"Nessuno");
     }
     if (k==="tariffa_mensile"){ da=euro(parseFloat(vo)||0); a=euro(parseFloat(vn)||0); }
-    acc.push({ts,data,campo:label,da,a});
+    acc.push({ts,data,campo:label,da,a,utente});
     return acc;
   },[]);
 };
 
 // ─── DETTAGLIO ────────────────────────────────────────────────────────────────
-const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete }) => {
+const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente="" }) => {
   const [form,      setForm]      = useState({...palmare});
   const [tab,       setTab]       = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
@@ -70,7 +70,7 @@ const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete }) => {
   };
 
   const handleSave = () => {
-    const log   = buildStorico(palmare, form, padroncini);
+    const log   = buildStorico(palmare, form, padroncini, utente);
     const saved = {...form, storico:[...storico,...log]};
     // Stato finale coerente con assegnazione
     if (saved.padroncino_id && saved.stato==="DISPONIBILE") saved.stato="ASSEGNATO";
@@ -321,7 +321,7 @@ const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete }) => {
 };
 
 // ─── LISTA PALMARI ────────────────────────────────────────────────────────────
-export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAddNew }) => {
+export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAddNew, utente="" }) => {
   const [search,      setSearch]      = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detail,      setDetail]      = useState(null);
@@ -331,6 +331,7 @@ export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAdd
       <PalmareDetail
         palmare={detail}
         padroncini={padroncini}
+        utente={utente}
         onBack={()=>setDetail(null)}
         onSave={p=>{ onSave(p); setDetail(p); }}
         onDelete={id=>{ onDelete(id); setDetail(null); }}

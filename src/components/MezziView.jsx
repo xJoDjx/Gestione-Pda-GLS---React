@@ -57,7 +57,7 @@ const CAMPI_STORICO = [
   ["canone_noleggio",   "Canone Noleggio"],
 ];
 
-const buildStorico = (vecchio, nuovo, padroncini=[]) => {
+const buildStorico = (vecchio, nuovo, padroncini=[], utente="") => {
   const oggi = new Date().toLocaleDateString("it-IT");
   const ts   = new Date().toISOString();
   return CAMPI_STORICO.reduce((acc, [campo, label]) => {
@@ -75,13 +75,13 @@ const buildStorico = (vecchio, nuovo, padroncini=[]) => {
     if ((campo === "rata_noleggio" || campo === "canone_noleggio")) {
       da = euro(parseFloat(vOld)||0); a = euro(parseFloat(vNew)||0);
     }
-    acc.push({ ts, data: oggi, campo: label, da, a });
+    acc.push({ ts, data: oggi, campo: label, da, a, utente });
     return acc;
   }, []);
 };
 
 // ─── DETTAGLIO MEZZO ─────────────────────────────────────────────────────────
-const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete }) => {
+const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete, utente = "" }) => {
   const [form, setForm] = useState({ ...mezzo });
   const [activeTab, setActiveTab] = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
@@ -98,7 +98,7 @@ const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete }) => {
 
   // ── BUG FIX: salva usando `form` (stato aggiornato), confronta con `mezzo` (prop iniziale)
   const handleSave = () => {
-    const nuoviLog = buildStorico(mezzo, form, padroncini);
+    const nuoviLog = buildStorico(mezzo, form, padroncini, utente);
     const formConStorico = { ...form, storico: [...storico, ...nuoviLog] };
     onSave(formConStorico);
   };
@@ -439,7 +439,7 @@ const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete }) => {
 };
 
 // ─── VISTA PRINCIPALE MEZZI ──────────────────────────────────────────────────
-export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew }) => {
+export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew, utente = "" }) => {
   const [search, setSearch]           = useState("");
   const [filtroStato,    setFiltroStato]    = useState("TUTTI");
   const [filtroCategoria, setFiltroCategoria] = useState("");
@@ -450,11 +450,10 @@ export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew }) => 
       <MezzoDetail
         mezzo={detailMezzo}
         padroncini={padroncini}
+        utente={utente}
         onBack={()=>setDetailMezzo(null)}
         onSave={(m)=>{
           onSave(m);
-          // BUG FIX: aggiorna detailMezzo con il form salvato (non con m dalla lista)
-          // così lo storico confronta correttamente dalla prossima modifica
           setDetailMezzo(m);
         }}
         onDelete={(id)=>{ if(window.confirm("Eliminare questo mezzo?")){ onDelete(id); setDetailMezzo(null); } }}

@@ -247,6 +247,33 @@ function runMigrations() {
     ["storico",       "TEXT DEFAULT '[]'"],
   ].forEach(([c,d]) => addColumnIfMissing("cod_autisti", c, d));
 
+  db.exec(`CREATE TABLE IF NOT EXISTS activity_log (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts               TEXT NOT NULL,
+    utente           TEXT DEFAULT '',
+    username         TEXT DEFAULT '',
+    sezione          TEXT DEFAULT '',
+    entita_id        TEXT DEFAULT '',
+    entita_nome      TEXT DEFAULT '',
+    azione           TEXT DEFAULT '',
+    descrizione      TEXT DEFAULT '',
+    campi_modificati TEXT DEFAULT '[]',
+    created_at       TEXT DEFAULT (datetime('now'))
+  )`);
+
+  // Aggiunte colonne di sicurezza (per DB già esistenti)
+  [
+    ["ts",               "TEXT DEFAULT ''"],
+    ["utente",           "TEXT DEFAULT ''"],
+    ["username",         "TEXT DEFAULT ''"],
+    ["sezione",          "TEXT DEFAULT ''"],
+    ["entita_id",        "TEXT DEFAULT ''"],
+    ["entita_nome",      "TEXT DEFAULT ''"],
+    ["azione",           "TEXT DEFAULT ''"],
+    ["descrizione",      "TEXT DEFAULT ''"],
+    ["campi_modificati", "TEXT DEFAULT '[]'"],
+  ].forEach(([c, d]) => addColumnIfMissing("activity_log", c, d));
+
   db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
 }
 
@@ -489,6 +516,38 @@ function getRicariche() {
 }
 function saveRicariche(data) { setSetting("ricariche", JSON.stringify(data)); }
 
+function insertLogEntry(entry) {
+  const now = new Date().toISOString();
+  const campi = typeof entry.campi_modificati === "string"
+    ? entry.campi_modificati
+    : JSON.stringify(entry.campi_modificati || []);
+  db.prepare(`
+    INSERT INTO activity_log (ts, utente, username, sezione, entita_id, entita_nome, azione, descrizione, campi_modificati, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    entry.ts || now,
+    entry.utente      || "",
+    entry.username    || "",
+    entry.sezione     || "",
+    entry.entita_id   || "",
+    entry.entita_nome || "",
+    entry.azione      || "",
+    entry.descrizione || "",
+    campi,
+    now
+  );
+  // Restituisce l'entry con l'id generato
+  return { ...entry, id: db.prepare("SELECT last_insert_rowid() as id").get().id, campi_modificati: entry.campi_modificati || [] };
+}
+
+function getAllLogEntries() {
+  return db.prepare("SELECT * FROM activity_log ORDER BY ts DESC, id DESC LIMIT 5000").all()
+    .map(r => ({
+      ...r,
+      campi_modificati: (() => { try { return JSON.parse(r.campi_modificati || "[]"); } catch { return []; } })(),
+    }));
+}
+
 // ─── WINDOW ───────────────────────────────────────────────────────────────────
 let mainWindow = null;
 
@@ -570,13 +629,13 @@ function registerIpcHandlers() {
       } catch(e) { console.error("[db] Errore copia:", e); }
     }
 
-    // Salva il path PRIMA di aprire il DB (così getDbPath() lo usa subito)
+  // Salva il path PRIMA di aprire il DB (così getDbPath() lo usa subito)
     store.set("dbPath", newPath);
     openDb();
     return newPath;
   });
 
-    // ─── APRI FILE CON APP NATIVA (salva base64 su temp + apri) ───────────────
+  // ─── APRI FILE CON APP NATIVA (salva base64 su temp + apri) ───────────────
   ipcMain.handle("open-file", async (_, { data, nome }) => {
     const os   = require("os");
     const path = require("path");
@@ -592,7 +651,7 @@ function registerIpcHandlers() {
     return { ok: true };
   });
 
-    // ─── SALVA FILE (download) ──────────────────────────────────────────────
+  // ─── SALVA FILE (download) ──────────────────────────────────────────────
   ipcMain.handle("save-file", async (_, { data, nome }) => {
     const { dialog } = require("electron");
     const fs         = require("fs");
@@ -602,6 +661,14 @@ function registerIpcHandlers() {
     fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
     return { ok: true };
   });
+
+  // ── Log Storico Globale ───────────────────────────────────────────────────────
+  ipcMain.handle("save-log-entry", (_, entry) => {
+    const saved = insertLogEntry(entry);
+    return { ok: true, entry: saved };
+  });
+
+  ipcMain.handle("get-log-entries", () => getAllLogEntries());
 }
 
 // ─── LIFECYCLE ────────────────────────────────────────────────────────────────

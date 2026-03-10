@@ -40,7 +40,7 @@ const TRACK = [
   ["note",           "Note"],
 ];
 
-const buildStorico = (old, neo, pads = []) => {
+const buildStorico = (old, neo, pads, utente = "") => {
   const ts   = new Date().toISOString();
   const data = new Date().toLocaleDateString("it-IT");
   const log  = [];
@@ -58,17 +58,17 @@ const buildStorico = (old, neo, pads = []) => {
       da = euro(parseFloat(vo) || 0);
       a  = euro(parseFloat(vn) || 0);
     }
-    log.push({ ts, data, campo: label, da, a });
+    log.push({ ts, data, campo: label, da, a, utente });
   });
 
   // Documenti aggiunti/rimossi
   const docsOld = (old.documenti || []).map(d => d.nome || d.id).filter(Boolean);
   const docsNew = (neo.documenti || []).map(d => d.nome || d.id).filter(Boolean);
   docsNew.filter(n => !docsOld.includes(n)).forEach(n =>
-    log.push({ ts, data, campo: "Documento aggiunto", da: "—", a: n })
+    log.push({ ts, data, campo: "Documento aggiunto", da: "—", a: n, utente })
   );
   docsOld.filter(n => !docsNew.includes(n)).forEach(n =>
-    log.push({ ts, data, campo: "Documento rimosso", da: n, a: "—" })
+    log.push({ ts, data, campo: "Documento rimosso", da: n, a: "—", utente })
   );
 
   return log;
@@ -105,7 +105,7 @@ const salvaFile = async (d) => {
 };
 
 // ─── DETTAGLIO ────────────────────────────────────────────────────────────────
-const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => {
+const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete,utente="" }) => {
   const [form,      setForm]      = useState({ ...autista });
   const [tab,       setTab]       = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
@@ -134,7 +134,7 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
         ? (form.stato === "DISPONIBILE" ? "ASSEGNATO" : form.stato)
         : (form.stato === "ASSEGNATO"   ? "DISPONIBILE" : form.stato),
     };
-    const log   = buildStorico(autista, formFinal, padroncini);
+    const log   = buildStorico(autista, formFinal, padroncini,utente);
     const saved = { ...formFinal, storico: [...storico, ...log] };
     onSave(saved);
   };
@@ -363,7 +363,7 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
 };
 
 // ─── LISTA ────────────────────────────────────────────────────────────────────
-export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDelete, onAddNew }) => {
+export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDelete, onAddNew,utente="" }) => {
   const [search,      setSearch]      = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detailId,    setDetailId]    = useState(null);
@@ -375,6 +375,7 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
       <CodAutistaDetail
         autista={detailAutista}
         padroncini={padroncini}
+        utente={utente}
         onBack={() => setDetailId(null)}
         onSave={a => { onSave(a); }}
         onDelete={id => { onDelete(id); setDetailId(null); }}

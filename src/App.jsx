@@ -13,6 +13,8 @@ import { RicercaGlobale } from "./components/RicercaGlobale";
 import { Icon } from "./components/Icons";
 import { euro, giorniMese, MESI } from "./utils/formatters";
 import { CodAutistiView } from "./components/CodAutistiView";
+import { LogStoricoView }   from "./components/LogStoricoView";
+import { useActivityLog }   from "./hooks/useActivityLog";
 
 const MESI_IT = MESI;
 
@@ -155,6 +157,7 @@ const ImpostazioniView = ({ onReload, addebitiStandard = [], onSaveAddebitiStand
 // ─── APP INNER ────────────────────────────────────────────────────────────────
 const AppInner = () => {
   const { currentUser, isAdmin, canAccess, logout } = useAuth();
+  const { logEntries, addLogEntry } = useActivityLog();
   const [view, setView] = useState("dashboard");
   const [mese, setMese] = useState(MESI_IT[new Date().getMonth()]);
   const [anno, setAnno] = useState(new Date().getFullYear());
@@ -179,15 +182,61 @@ const AppInner = () => {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  const handleSavePadroncino = useCallback(async (p) => {
-    try { await savePadroncino(p); notify("Padroncino salvato!"); }
-    catch (e) { notify("Errore nel salvataggio: " + e.message, "error"); }
-  }, [savePadroncino, notify]);
+  const handleSavePadroncino = useCallback(async (p, vecchio = null, azione = "MODIFICA") => {
+    try {
+      await savePadroncino(p);
+      notify("Padroncino salvato!");
+
+      // Calcola diff campi
+      const campi = [];
+      if (vecchio) {
+        const WATCH = [
+          ["nome",          "Nome"],
+          ["codice",        "Codice"],
+          ["stato",         "Stato"],
+          ["durc_stato",    "DURC Stato"],
+          ["durc_scadenza", "DURC Scadenza"],
+          ["dvr_stato",     "DVR Stato"],
+          ["dvr_scadenza",  "DVR Scadenza"],
+          ["nota_varie",    "Note"],
+        ];
+        for (const [k, label] of WATCH) {
+          const vo = String(vecchio?.[k] ?? "");
+          const vn = String(p?.[k] ?? "");
+          if (vo !== vn) campi.push({ campo: label, da: vo || "—", a: vn || "—" });
+        }
+      }
+
+      addLogEntry({
+        sezione:     "padroncini",
+        azione,
+        entita_id:   p.id,
+        entita_nome: p.nome || "—",
+        descrizione: azione === "CREA"
+          ? `Creato padroncino "${p.nome}"`
+          : `Modificato padroncino "${p.nome}"`,
+        currentUser,
+        campi,
+      });
+    } catch (e) { notify("Errore nel salvataggio: " + e.message, "error"); }
+  }, [savePadroncino, notify, addLogEntry, currentUser]);
 
   const handleDeletePadroncino = useCallback(async (id) => {
-    try { await deletePadroncino(id); notify("Padroncino eliminato"); }
-    catch (e) { notify("Errore eliminazione: " + e.message, "error"); }
-  }, [deletePadroncino, notify]);
+    try {
+      const pad = padroncini.find(p => p.id === id);
+      await deletePadroncino(id);
+      notify("Padroncino eliminato");
+      addLogEntry({
+        sezione:     "padroncini",
+        azione:      "ELIMINA",
+        entita_id:   id,
+        entita_nome: pad?.nome || id,
+        descrizione: `Eliminato padroncino "${pad?.nome || id}"`,
+        currentUser,
+        campi: [],
+      });
+    } catch (e) { notify("Errore eliminazione: " + e.message, "error"); }
+  }, [deletePadroncino, padroncini, notify, addLogEntry, currentUser]);
 
   const handleSaveConteggio = useCallback(async (c) => {
     try { await saveConteggio(c); notify("Conteggio salvato!"); }
@@ -213,7 +262,7 @@ const AppInner = () => {
       durc_scadenza: null, durc_stato: "NON PRESENTE", fatturato_totale: 0,
       palmari: [], mezzi: [], codici_autisti: [], fatturato_template: [], note_varie: "", dvr: "",
     };
-    handleSavePadroncino(newPad);
+    handleSavePadroncino(newPad, null, "CREA");
     notify("Nuovo padroncino creato!");
   };
 
@@ -228,27 +277,145 @@ const AppInner = () => {
       maggiorazione_ricarica_pct: categoria === "DISTRIBUZIONE" ? 20 : null,
       note_veicolo: "",
     };
-    saveMezzo(m);
+    handleSaveMezzo(m, null, "CREA");
     notify("Nuovo mezzo creato — " + (categoria === "DISTRIBUZIONE" ? "Distribuzione" : "Auto Aziendale"));
   };
+
+    const handleSaveMezzo = useCallback(async (m, vecchio = null, azione = null) => {
+    const az = azione || (mezzi?.find(x => x.id === m.id) ? "MODIFICA" : "CREA");
+    try {
+      await saveMezzo(m);
+      // Notifica solo se non chiamata in background (es. sync)
+    } catch (e) { console.error("[saveMezzo]", e); throw e; }
+
+    const campi = (m.storico || [])
+      .slice(vecchio ? (vecchio.storico || []).length : 0)
+      .map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+
+    addLogEntry({
+      sezione:     "mezzi",
+      azione:      az,
+      entita_id:   m.id,
+      entita_nome: m.targa || m.id,
+      descrizione: az === "CREA"
+        ? `Creato mezzo "${m.targa || m.id}"`
+        : `Modificato mezzo "${m.targa || m.id}"`,
+      currentUser,
+      campi,
+    });
+  }, [saveMezzo, mezzi, addLogEntry, currentUser]);
+
+  const handleDeleteMezzo = useCallback(async (id) => {
+    const m = mezzi?.find(x => x.id === id);
+    await deleteMezzo(id);
+    addLogEntry({
+      sezione:     "mezzi",
+      azione:      "ELIMINA",
+      entita_id:   id,
+      entita_nome: m?.targa || id,
+      descrizione: `Eliminato mezzo "${m?.targa || id}"`,
+      currentUser, campi: [],
+    });
+  }, [deleteMezzo, mezzi, addLogEntry, currentUser]);
 
   const handleAddNewPalmare = () => {
     const p = {
       id: "PALM_" + Date.now(), seriale: "", modello: "", stato: "DISPONIBILE",
       padroncino_id: "", tariffa_mensile: 0, data_assegnazione: "", data_fine: "", note: "",
     };
-    savePalmare(p);
+    handleSavePalmare(p, null, "CREA");
     notify("Nuovo palmare creato!");
   };
+
+  const handleSavePalmare = useCallback(async (p, vecchio = null) => {
+    const az = palmari?.find(x => x.id === p.id) ? "MODIFICA" : "CREA";
+    try { await savePalmare(p); } catch (e) { console.error("[savePalmare]", e); throw e; }
+
+    const campi = (p.storico || [])
+      .slice(vecchio ? (vecchio.storico || []).length : 0)
+      .map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+
+    addLogEntry({
+      sezione:     "palmari",
+      azione:      az,
+      entita_id:   p.id,
+      entita_nome: p.seriale || p.id,
+      descrizione: az === "CREA"
+        ? `Creato palmare "${p.seriale || p.id}"`
+        : `Modificato palmare "${p.seriale || p.id}"`,
+      currentUser,
+      campi,
+    });
+  }, [savePalmare, palmari, addLogEntry, currentUser]);
+
+  const handleDeletePalmare = useCallback(async (id) => {
+    const p = palmari?.find(x => x.id === id);
+    await deletePalmare(id);
+    addLogEntry({
+      sezione: "palmari", azione: "ELIMINA",
+      entita_id: id, entita_nome: p?.seriale || id,
+      descrizione: `Eliminato palmare "${p?.seriale || id}"`,
+      currentUser, campi: [],
+    });
+  }, [deletePalmare, palmari, addLogEntry, currentUser]);
 
   const handleAddNewCodAutista = () => {
     const a = {
       id: "COD_" + Date.now(), codice: "", stato: "DISPONIBILE",
       padroncino_id: "", note: "", storico: [],
     };
-    saveCodAutista(a);
+    handleSaveCodAutista(a, null, "CREA");
     notify("Nuovo codice autista creato!");
   };  
+
+    const handleSaveCodAutista = useCallback(async (a) => {
+    const az = codAutisti?.find(x => x.id === a.id) ? "MODIFICA" : "CREA";
+    try { await saveCodAutista(a); } catch (e) { console.error("[saveCodAutista]", e); throw e; }
+
+    const campi = (a.storico || [])
+      .slice(0) // prende tutto perché il componente aggiunge solo le diff
+      .slice(-5) // ultime 5 voci
+      .map(s => ({ campo: s.campo, da: s.da, a: s.a }));
+
+    addLogEntry({
+      sezione:     "codici",
+      azione:      az,
+      entita_id:   a.id,
+      entita_nome: a.codice || a.id,
+      descrizione: az === "CREA"
+        ? `Creato codice autista "${a.codice || a.id}"`
+        : `Modificato codice autista "${a.codice || a.id}"`,
+      currentUser,
+      campi,
+    });
+  }, [saveCodAutista, codAutisti, addLogEntry, currentUser]);
+
+  const handleDeleteCodAutista = useCallback(async (id) => {
+    const a = codAutisti?.find(x => x.id === id);
+    await deleteCodAutista(id);
+    addLogEntry({
+      sezione: "codici", azione: "ELIMINA",
+      entita_id: id, entita_nome: a?.codice || id,
+      descrizione: `Eliminato codice autista "${a?.codice || id}"`,
+      currentUser, campi: [],
+    });
+  }, [deleteCodAutista, codAutisti, addLogEntry, currentUser]);
+
+  const handleSaveConteggioLogged = useCallback(async (c) => {
+    try {
+      await handleSaveConteggio(c);
+      const pad = padroncini?.find(p => p.id === c.padroncino_id);
+      addLogEntry({
+        sezione:     "conteggi",
+        azione:      "MODIFICA",
+        entita_id:   c.padroncino_id,
+        entita_nome: `${pad?.nome || c.padroncino_id} — ${c.mese} ${c.anno}`,
+        descrizione: `Salvato conteggio ${c.mese} ${c.anno} per "${pad?.nome || c.padroncino_id}"`,
+        currentUser,
+        campi: [],
+      });
+    } catch (e) { notify("Errore nel salvataggio: " + e.message, "error"); }
+  }, [handleSaveConteggio, padroncini, addLogEntry, currentUser, notify]);
 
   // Nav items filtrati per permessi
   const navItems = [
@@ -263,6 +430,7 @@ const AppInner = () => {
     { id: "export",       label: "Esportazione",         icon: "export",      show: true },
     { id: "impostazioni", label: "Impostazioni",         icon: "settings",    show: isAdmin },
     { id: "utenti",       label: "Gestione Utenti",      icon: "users",       show: isAdmin },
+    { id: "log_storico", label: "Log Storico",  icon: "list",    show: isAdmin },
     
   ].filter(n => n.show);
 
@@ -417,78 +585,26 @@ const AppInner = () => {
               onSaveCodAutista={saveCodAutista}
               onAddNew={handleAddNew}
               onLogChange={(nuovoForm, tipo, vecchioForm) => {
-                const LABEL = {
-                  nome:            "Ragione Sociale",
-                  codice:          "Codice GLS",
-                  stato:           "Stato",
-                  partita_iva:     "Partita IVA",
-                  codice_fiscale:  "Codice Fiscale",
-                  telefono:        "Telefono",
-                  email:           "Email",
-                  sede_legale:     "Sede Legale",
-                  via_sede_legale: "Via Sede",
-                  rappresentante:  "Rappresentante",
-                  durc_scadenza:   "Scad. DURC",
-                  durc_stato:      "Stato DURC",
-                  dvr_stato:       "Stato DVR",
-                  dvr_scadenza:    "Scad. DVR",
-                  note_varie:      "Note varie",
-                };
-
-                const campi = [];
-
-                // ── Campi anagrafica scalari ─────────────────────────────────────────────
-                Object.entries(LABEL).forEach(([k, label]) => {
-                  const da = String(vecchioForm?.[k] ?? "");
-                  const a  = String(nuovoForm?.[k]  ?? "");
-                  if (da !== a) campi.push({ label, da: da || "—", a: a || "—" });
-                });
-
-                // ── Documenti principali (presenza/assenza) ──────────────────────────────
-                [
-                  ["doc_contratto", "Contratto"],
-                  ["doc_durc",      "Doc DURC"],
-                  ["doc_dvr",       "Doc DVR"],
-                  ["visura_doc",    "Visura camerale"],
-                ].forEach(([k, label]) => {
-                  const aveva = !!(vecchioForm?.[k]?.data || vecchioForm?.[k]?.data_b64 || vecchioForm?.[k]);
-                  const ha    = !!(nuovoForm?.[k]?.data   || nuovoForm?.[k]?.data_b64   || nuovoForm?.[k]);
-                  if (aveva !== ha)
-                    campi.push({ label, da: aveva ? "✅ Presente" : "—", a: ha ? "✅ Caricato" : "Rimosso" });
-                });
-
-                // ── Palmari aggiunti/rimossi ─────────────────────────────────────────────
-                const palOld = (vecchioForm?.palmari || []).map(p => p.seriale).filter(Boolean);
-                const palNew = (nuovoForm?.palmari   || []).map(p => p.seriale).filter(Boolean);
-                palNew.filter(s => !palOld.includes(s))
-                  .forEach(s => campi.push({ label: "Palmare aggiunto", da: "—", a: s }));
-                palOld.filter(s => !palNew.includes(s))
-                  .forEach(s => campi.push({ label: "Palmare rimosso", da: s, a: "—" }));
-
-                // ── Mezzi aggiunti/rimossi ───────────────────────────────────────────────
-                const mOld = (vecchioForm?.mezzi || []).map(m => m.targa).filter(Boolean);
-                const mNew = (nuovoForm?.mezzi   || []).map(m => m.targa).filter(Boolean);
-                mNew.filter(t => !mOld.includes(t))
-                  .forEach(t => campi.push({ label: "Mezzo aggiunto", da: "—", a: t }));
-                mOld.filter(t => !mNew.includes(t))
-                  .forEach(t => campi.push({ label: "Mezzo rimosso", da: t, a: "—" }));
-
-                // ── Autisti aggiunti/rimossi ─────────────────────────────────────────────
-                const aOld = (vecchioForm?.codici_autisti || []).map(a => a.codice).filter(Boolean);
-                const aNew = (nuovoForm?.codici_autisti   || []).map(a => a.codice).filter(Boolean);
-                aNew.filter(c => !aOld.includes(c))
-                  .forEach(c => campi.push({ label: "Autista aggiunto", da: "—", a: c }));
-                aOld.filter(c => !aNew.includes(c))
-                  .forEach(c => campi.push({ label: "Autista rimosso", da: c, a: "—" }));
-
+                const WATCH_PAD = [
+                  ["nome","Nome"],["codice","Codice"],["stato","Stato"],
+                  ["durc_stato","DURC Stato"],["durc_scadenza","DURC Scadenza"],
+                  ["dvr_stato","DVR Stato"],["dvr_scadenza","DVR Scadenza"],
+                ];
+                const campi = WATCH_PAD.reduce((acc,[k,label]) => {
+                  const vo = String(vecchioForm?.[k] ?? ""), vn = String(nuovoForm?.[k] ?? "");
+                  if (vo !== vn) acc.push({ campo: label, da: vo||"—", a: vn||"—" });
+                  return acc;
+                },[]);
+                const azione = tipo?.includes("Crea") ? "CREA" : (tipo?.includes("Elimina") ? "ELIMINA" : "MODIFICA");
                 const entry = {
-                  tipo:    campi.length > 0 ? (tipo || "Modifica") : (tipo || "Salvataggio"),
+                  azione,
                   campi,
                   utente:  currentUser?.nome || currentUser?.username || "Sistema",
                   ts:      new Date().toISOString(),
                 };
                 const updated = { ...nuovoForm, cronologia: [...(nuovoForm.cronologia || []), entry] };
-                handleSavePadroncino(updated);
+                handleSavePadroncino(updated, vecchioForm, azione);
+                // Il wrapper handleSavePadroncino (PATCH 3) si occupa del log globale.
               }}
             />
           )}
@@ -496,20 +612,21 @@ const AppInner = () => {
             <ConteggiEditor
               padroncini={padroncini} conteggi={conteggi}
               mese={mese} anno={anno}
-              onSave={handleSaveConteggio}
+              onSave={handleSaveConteggioLogged}
               onDelete={deleteConteggio}
               addebiti_standard={addebitiStandard}
               ricariche={ricariche || {}} mezziFlotta={mezzi || []}
             />
           )}
-          {view === "mezzi"       && <MezziView mezzi={mezzi || []} padroncini={padroncini} onSave={saveMezzo} onDelete={deleteMezzo} onAddNew={handleAddNewMezzo} />}
+          {view === "mezzi"       && <MezziView mezzi={mezzi || []} padroncini={padroncini} onSave={handleSaveMezzo} onDelete={handleDeleteMezzo} onAddNew={handleAddNewMezzo} utente={currentUser?.nome || currentUser?.username || ""} />}
           {view === "ricariche"   && <RicaricheView ricariche={ricariche || {}} onSave={saveRicaricheMese} mezzi={mezzi || []} padroncini={padroncini || []} mese={mese} anno={anno} onSaveMezzo={saveMezzo} />}
           {view === "ricerca"     && <RicercaGlobale padroncini={padroncini} conteggi={conteggi} />}
-          {view === "palmari"    && <PalmariView palmari={palmari || []} padroncini={padroncini} onSave={savePalmare} onDelete={deletePalmare} onAddNew={handleAddNewPalmare} />}
-          {view === "cod_autisti" && <CodAutistiView codAutisti={codAutisti || []} onSave={saveCodAutista} onDelete={deleteCodAutista} onAddNew={handleAddNewCodAutista} />}
+          {view === "palmari"    && <PalmariView palmari={palmari || []} padroncini={padroncini} onSave={handleSavePalmare} onDelete={handleDeletePalmare} onAddNew={handleAddNewPalmare} utente={currentUser?.nome || currentUser?.username || ""} />}
+          {view === "cod_autisti" && <CodAutistiView codAutisti={codAutisti || []} onSave={handleSaveCodAutista} onDelete={handleDeleteCodAutista} onAddNew={handleAddNewCodAutista} utente={currentUser?.nome || currentUser?.username || ""} />}
           {view === "export"      && <ExportView mese={mese} anno={anno} />}
           {view === "impostazioni"&& <ImpostazioniView onReload={reload} addebitiStandard={addebitiStandard} onSaveAddebitiStandard={saveAddebitiStandard} />}
           {view === "utenti"      && isAdmin && <GestioneUtenti />}
+          {view === "log_storico" && isAdmin && <LogStoricoView logEntries={logEntries} />}
         </div>
       </main>
 
