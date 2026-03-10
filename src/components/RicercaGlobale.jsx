@@ -3,7 +3,7 @@ import { Icon } from "./Icons";
 import { Badge } from "./BaseComponents";
 import { euro, statoColor } from "../utils/formatters";
 
-export const RicercaGlobale = ({ padroncini, conteggi }) => {
+export const RicercaGlobale = ({ padroncini, conteggi, mezzi = [], palmari = [], codAutisti = [] }) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
 
@@ -12,6 +12,7 @@ export const RicercaGlobale = ({ padroncini, conteggi }) => {
     const q = query.toLowerCase();
     const found = [];
 
+    // ── Ricerche esistenti su padroncini (lasciale invariate) ──
     padroncini.forEach(p => {
       // Nome / codice padroncino
       if (p.nome?.toLowerCase().includes(q) || p.codice?.toLowerCase().includes(q)) {
@@ -85,8 +86,58 @@ export const RicercaGlobale = ({ padroncini, conteggi }) => {
       }
     });
 
-    setResults(found.slice(0,80));
-  }, [query, padroncini, conteggi]);
+    // ── Ricerca flotta mezzi globale ──────────────────────────
+    const targheGiaTrovate = new Set(found.filter(r => r.tag === "Mezzo").map(r => r.label));
+    mezzi.forEach(m => {
+      const campi = [m.targa, m.marca, m.modello, m.tipo, m.alimentazione, m.stato, m.autista, m.proprietario, m.note_veicolo];
+      if (campi.some(f => f?.toLowerCase().includes(q))) {
+        const label = `Targa ${m.targa}`;
+        if (targheGiaTrovate.has(label)) return; // evita duplicati
+        const pad = padroncini.find(p => p.id === m.padroncino_id);
+        found.push({
+          type: "mezzo",
+          label,
+          sub: `${pad ? pad.nome + " · " : ""}${[m.marca, m.modello, m.alimentazione].filter(Boolean).join(" ")} · ${m.stato || ""}`,
+          tag: "Flotta Mezzi",
+          tagColor: "#991b1b",
+          tagBg: "#fee2e2",
+        });
+      }
+    });
+
+    // ── Ricerca flotta palmari globale ────────────────────────
+    palmari.forEach(pal => {
+      const campi = [pal.seriale, pal.modello, pal.note];
+      if (campi.some(f => f?.toLowerCase().includes(q))) {
+        const pad = padroncini.find(p => p.id === pal.padroncino_id);
+        found.push({
+          type: "palmare",
+          label: `Palmare ${pal.seriale}`,
+          sub: `${pad ? pad.nome + " · " : ""}${pal.modello || ""} · ${pal.stato || ""}`,
+          tag: "Palmare",
+          tagColor: "#92400e",
+          tagBg: "#fef3c7",
+        });
+      }
+    });
+
+    // ── Ricerca flotta cod. autisti globale ───────────────────
+    codAutisti.forEach(a => {
+      if (a.codice?.toLowerCase().includes(q) || a.note?.toLowerCase().includes(q)) {
+        const pad = padroncini.find(p => p.id === a.padroncino_id);
+        found.push({
+          type: "cod_autista",
+          label: `Autista ${a.codice}`,
+          sub: `${pad ? pad.nome + " · " : ""}${a.stato || ""}`,
+          tag: "Cod. Autista",
+          tagColor: "#1d4ed8",
+          tagBg: "#dbeafe",
+        });
+      }
+    });
+
+    setResults(found);
+  }, [query, padroncini, conteggi, mezzi, palmari, codAutisti]);
 
   const typeIcon  = { padroncino:"users", conteggio:"calculator", nota:"note", cronologia:"calendar" };
   const typeColor = { padroncino:"#3b82f6", conteggio:"#10b981", nota:"#8b5cf6", cronologia:"#7c3aed" };
