@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Icon } from "./Icons";
 import { euro, durcDaysLeft } from "../utils/formatters";
 
@@ -31,31 +31,48 @@ const Sel = ({ label, value, onChange, options }) => (
 );
 
 // ─── STORICO ──────────────────────────────────────────────────────────────────
-const TRACK = [
-  ["stato","Stato"],["padroncino_id","Padroncino"],
-  ["tariffa_mensile","Tariffa mensile"],["data_assegnazione","Data assegnazione"],["data_fine","Fine assegnazione"],
+const CAMPI_PALMARI = [
+  ["seriale",          "Seriale"],
+  ["modello",          "Modello"],
+  ["modello_custom",   "Modello personalizzato"],
+  ["stato",            "Stato"],
+  ["padroncino_id",    "Padroncino"],
+  ["tariffa_mensile",  "Tariffa mensile"],
+  ["data_assegnazione","Data assegnazione"],
+  ["data_fine",        "Data fine assegnazione"],
+  ["note",             "Note"],
+  ["imei",             "IMEI"],
+  ["sim",              "SIM"],
+  ["numero_sim",       "Numero SIM"],
+  ["firmware",         "Firmware"],
+  ["data_acquisto",    "Data acquisto"],
+  ["fornitore",        "Fornitore"],
 ];
-const buildStorico = (old, neo, pads, utente = "") => {
-  const ts = new Date().toISOString();
+
+const buildStorico = (vecchio, nuovo, pads = [], utente = "") => {
+  const ts   = new Date().toISOString();
   const data = new Date().toLocaleDateString("it-IT");
-  return TRACK.reduce((acc,[k,label])=>{
-    const vo = String(old[k]??""), vn = String(neo[k]??"");
-    if (vo===vn) return acc;
-    let da=vo||"—", a=vn||"—";
-    if (k==="padroncino_id"){
-      da = pads.find(p=>p.id===vo)?.nome||(vo?"—":"Nessuno");
-      a  = pads.find(p=>p.id===vn)?.nome||(vn?"—":"Nessuno");
+  return CAMPI_PALMARI.reduce((acc, [k, label]) => {
+    const vo = String(vecchio[k] ?? "");
+    const vn = String(nuovo[k]  ?? "");
+    if (vo === vn) return acc;
+    let da = vo || "—", a = vn || "—";
+    if (k === "padroncino_id") {
+      da = pads.find(p => p.id === vo)?.nome || (vo ? vo : "Nessuno");
+      a  = pads.find(p => p.id === vn)?.nome || (vn ? vn : "Nessuno");
     }
-    if (k==="tariffa_mensile"){ da=euro(parseFloat(vo)||0); a=euro(parseFloat(vn)||0); }
-    acc.push({ts,data,campo:label,da,a,utente});
+    if (k === "tariffa_mensile") {
+      da = da !== "—" ? `€ ${parseFloat(da || 0).toFixed(2)}` : "—";
+      a  = a  !== "—" ? `€ ${parseFloat(a  || 0).toFixed(2)}` : "—";
+    }
+    acc.push({ ts, data, campo: label, da, a, utente });
     return acc;
-  },[]);
+  }, []);
 };
 
 // ─── DETTAGLIO ────────────────────────────────────────────────────────────────
 const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente = "" }) => {
-  const [form,      setForm]      = useState({...palmare});
-  const baseline = useRef({ ...palmare });  // FIX 1
+  const [form, setForm] = useState({ ...palmare });
   const [tab,       setTab]       = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
   const [notaTesto, setNotaTesto] = useState("");
@@ -71,13 +88,13 @@ const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente =
   };
 
   const handleSave = () => {
-    const nuoviLog = buildStorico(baseline.current, form, padroncini, utente);
+    // Confronta col `palmare` prop (versione salvata nel DB) — sempre aggiornata
+    const nuoviLog = buildStorico(palmare, form, padroncini, utente);
     const saved = { ...form, storico: [...(form.storico || []), ...nuoviLog] };
     if (saved.padroncino_id && saved.stato === "DISPONIBILE") saved.stato = "ASSEGNATO";
     if (!saved.padroncino_id && saved.stato === "ASSEGNATO")  saved.stato = "DISPONIBILE";
-    baseline.current = { ...saved };  // FIX 1: aggiorna punto di riferimento
-    setForm(saved);                   // FIX 2: storico visibile immediatamente
-    onSave(saved, nuoviLog);          // FIX 3: passa nuovi log al parent
+    setForm(saved);           // aggiorna form locale → storico visibile subito
+    onSave(saved, nuoviLog);  // passa nuoviLog al parent per il log globale
   };
 
   const addDoc = () => {
@@ -368,17 +385,20 @@ const PalmareDetail = ({ palmare, padroncini, onSave, onBack, onDelete, utente =
 export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAddNew, utente="" }) => {
   const [search,      setSearch]      = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
-  const [detail,      setDetail]      = useState(null);
+  const [detailId,    setDetailId]    = useState(null);
+
+  // Sempre fresco dal DB — elimina il problema del "detail" stale
+  const detail = detailId ? palmari.find(p => p.id === detailId) : null;
 
   if (detail) {
     return (
       <PalmareDetail
-        palmare={detail}
+        palmare={detail}            // prop sempre aggiornato dal DB dopo ogni save
         padroncini={padroncini}
         utente={utente}
-        onBack={()=>setDetail(null)}
-        onSave={(p, nuoviLog)=>{ onSave(p, nuoviLog); setDetail(p); }}
-        onDelete={id=>{ onDelete(id); setDetail(null); }}
+        onBack={() => setDetailId(null)}
+        onSave={(saved, nuoviLog) => { onSave(saved, nuoviLog); }}
+        onDelete={id => { onDelete(id); setDetailId(null); }}
       />
     );
   }
@@ -469,7 +489,7 @@ export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAdd
                     :<span style={{ color:"#94a3b8" }}>—</span>}
                 </td>
                 <td style={{ padding:"11px 12px",borderBottom:"1px solid #f1f5f9" }}>
-                  <button onClick={()=>setDetail(p)}
+                  <button onClick={()=>setDetailId(p.id)}
                     style={{ padding:"5px 12px",borderRadius:7,background:"#f5f3ff",border:"1px solid #e9d5ff",color:"#6366f1",fontSize:12,fontWeight:600,cursor:"pointer" }}>
                     Dettaglio
                   </button>

@@ -28,7 +28,7 @@ const Sel = ({ label, value, onChange, options }) => (
 
 // ─── STORICO builder ──────────────────────────────────────────────────────────
 // BUG 3 FIX: traccia tutti i campi rilevanti + documenti aggiunto/rimosso
-const TRACK = [
+const CAMPI_AUTISTI = [
   ["codice",         "Codice"],
   ["stato",          "Stato"],
   ["padroncino_id",  "Padroncino"],
@@ -38,16 +38,20 @@ const TRACK = [
   ["data_inizio",    "Data inizio"],
   ["data_fine",      "Data fine"],
   ["note",           "Note"],
+  ["contratto",      "Contratto"],
+  ["numero_badge",   "Numero badge"],
+  ["patente",        "Patente"],
+  ["scad_patente",   "Scad. patente"],
 ];
 
-const buildStorico = (old, neo, pads, utente = "") => {
+const buildStorico = (vecchio, nuovo, pads = [], utente = "") => {
   const ts   = new Date().toISOString();
   const data = new Date().toLocaleDateString("it-IT");
   const log  = [];
 
-  TRACK.forEach(([k, label]) => {
-    const vo = String(old[k] ?? "");
-    const vn = String(neo[k] ?? "");
+  CAMPI_AUTISTI.forEach(([k, label]) => {
+    const vo = String(vecchio[k] ?? "");
+    const vn = String(nuovo[k]  ?? "");
     if (vo === vn) return;
     let da = vo || "—", a = vn || "—";
     if (k === "padroncino_id") {
@@ -55,15 +59,15 @@ const buildStorico = (old, neo, pads, utente = "") => {
       a  = pads.find(p => p.id === vn)?.nome || (vn ? vn : "Nessuno");
     }
     if (k === "tariffa_fissa" || k === "tariffa_ritiro") {
-      da = euro(parseFloat(vo) || 0);
-      a  = euro(parseFloat(vn) || 0);
+      da = da !== "—" ? `€ ${parseFloat(da || 0).toFixed(2)}` : "—";
+      a  = a  !== "—" ? `€ ${parseFloat(a  || 0).toFixed(2)}` : "—";
     }
     log.push({ ts, data, campo: label, da, a, utente });
   });
 
   // Documenti aggiunti/rimossi
-  const docsOld = (old.documenti || []).map(d => d.nome || d.id).filter(Boolean);
-  const docsNew = (neo.documenti || []).map(d => d.nome || d.id).filter(Boolean);
+  const docsOld = (vecchio.documenti || []).map(d => d.nome || d.id).filter(Boolean);
+  const docsNew = (nuovo.documenti   || []).map(d => d.nome || d.id).filter(Boolean);
   docsNew.filter(n => !docsOld.includes(n)).forEach(n =>
     log.push({ ts, data, campo: "Documento aggiunto", da: "—", a: n, utente })
   );
@@ -135,11 +139,11 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete, utent
         ? (form.stato === "DISPONIBILE" ? "ASSEGNATO" : form.stato)
         : (form.stato === "ASSEGNATO"   ? "DISPONIBILE" : form.stato),
     };
-    const nuoviLog = buildStorico(baseline.current, formFinal, padroncini, utente);
+    // autista (prop) è sempre fresco da DB — usato come baseline
+    const nuoviLog = buildStorico(autista, formFinal, padroncini, utente);
     const saved = { ...formFinal, storico: [...(form.storico || []), ...nuoviLog] };
-    baseline.current = { ...saved };   // FIX 1
-    setForm(saved);                    // FIX 2
-    onSave(saved, nuoviLog);           // FIX 3
+    setForm(saved);           // visibilità immediata nel tab storico
+    onSave(saved, nuoviLog);  // passa nuoviLog al parent
   };
 
   // ── Gestione documenti ────────────────────────────────────────────────────
@@ -402,7 +406,7 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete, utent
 };
 
 // ─── LISTA ────────────────────────────────────────────────────────────────────
-export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDelete, onAddNew,utente="" }) => {
+export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDelete, onAddNew, utente = "" }) => {
   const [search,      setSearch]      = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detailId,    setDetailId]    = useState(null);
@@ -416,7 +420,7 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
         padroncini={padroncini}
         utente={utente}
         onBack={() => setDetailId(null)}
-        onSave={(a, nuoviLog)=>{ onSave(a, nuoviLog); setDetail(a); }}
+        onSave={(a, nuoviLog) => { onSave(a, nuoviLog); }}
         onDelete={id => { onDelete(id); setDetailId(null); }}
       />
     );

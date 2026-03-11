@@ -182,44 +182,48 @@ const AppInner = () => {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  const handleSavePadroncino = useCallback(async (p, vecchio = null, azione = "MODIFICA") => {
+  const handleSavePadroncino = useCallback(async (p) => {
     try {
       await savePadroncino(p);
       notify("Padroncino salvato!");
+    } catch (e) {
+      notify("Errore nel salvataggio: " + e.message, "error");
+      return;
+    }
+    // Estrai i campi modificati dall'ultima voce di cronologia
+    const cron = p.cronologia || [];
+    const lastEntry = cron[cron.length - 1];
+    const campiRaw  = lastEntry?.campi || [];
+    const campi = campiRaw.map(c => ({
+      campo: c.label || c.campo || "",
+      da:    c.da    || "—",
+      a:     c.a     || "—",
+    }));
 
-      // Calcola diff campi
-      const campi = [];
-      if (vecchio) {
-        const WATCH = [
-          ["nome",          "Nome"],
-          ["codice",        "Codice"],
-          ["stato",         "Stato"],
-          ["durc_stato",    "DURC Stato"],
-          ["durc_scadenza", "DURC Scadenza"],
-          ["dvr_stato",     "DVR Stato"],
-          ["dvr_scadenza",  "DVR Scadenza"],
-          ["nota_varie",    "Note"],
-        ];
-        for (const [k, label] of WATCH) {
-          const vo = String(vecchio?.[k] ?? "");
-          const vn = String(p?.[k] ?? "");
-          if (vo !== vn) campi.push({ campo: label, da: vo || "—", a: vn || "—" });
-        }
-      }
+    const az = padroncini?.find(x => x.id === p.id) ? "MODIFICA" : "CREA";
+    if (az === "MODIFICA" && campi.length === 0) return; // nessuna modifica reale rilevata
 
-      addLogEntry({
-        sezione:     "padroncini",
-        azione,
-        entita_id:   p.id,
-        entita_nome: p.nome || "—",
-        descrizione: azione === "CREA"
-          ? `Creato padroncino "${p.nome}"`
-          : `Modificato padroncino "${p.nome}"`,
-        currentUser,
-        campi,
-      });
-    } catch (e) { notify("Errore nel salvataggio: " + e.message, "error"); }
-  }, [savePadroncino, notify, addLogEntry, currentUser]);
+    let desc = "";
+    if (az === "CREA") {
+      desc = `Creato padroncino "${p.nome}"`;
+    } else if (campi.length === 1) {
+      desc = `"${p.nome}": ${campi[0].campo} → ${campi[0].a}`;
+    } else if (campi.length > 1) {
+      desc = `"${p.nome}": ${campi.map(c => `${c.campo} → ${c.a}`).join(" · ")}`;
+    } else {
+      desc = `Modificato "${p.nome}"`;
+    }
+
+    addLogEntry({
+      sezione:     "padroncini",
+      azione:      az,
+      entita_id:   p.id,
+      entita_nome: p.nome || p.id,
+      descrizione: desc,
+      currentUser,
+      campi,
+    });
+  }, [savePadroncino, padroncini, addLogEntry, currentUser, notify]);
 
   const handleDeletePadroncino = useCallback(async (id) => {
     try {
@@ -277,19 +281,15 @@ const AppInner = () => {
       maggiorazione_ricarica_pct: categoria === "DISTRIBUZIONE" ? 20 : null,
       note_veicolo: "",
     };
-    handleSaveMezzo(m, null, "CREA");
-    notify("Nuovo mezzo creato — " + (categoria === "DISTRIBUZIONE" ? "Distribuzione" : "Auto Aziendale"));
+    handleSaveMezzo(m, []);
   };
 
   const handleSaveMezzo = useCallback(async (m, nuoviLog = []) => {
     const az = mezzi?.find(x => x.id === m.id) ? "MODIFICA" : "CREA";
-    try { await saveMezzo(m); } catch (e) { console.error("[saveMezzo]", e); throw e; }
+    try { await saveMezzo(m); } catch (e) { notify("Errore mezzo: " + e.message, "error"); return; }
 
-    // nuoviLog viene passato direttamente dal componente MezzoDetail
-    // contiene SOLO le voci nuove di questa singola operazione di salvataggio
     const campi = (nuoviLog || []).map(s => ({ campo: s.campo, da: s.da, a: s.a }));
-
-    if (az === "MODIFICA" && campi.length === 0) return; // nessuna modifica reale
+    if (az === "MODIFICA" && campi.length === 0) return;
 
     addLogEntry({
       sezione:     "mezzi",
@@ -299,33 +299,60 @@ const AppInner = () => {
       descrizione: az === "CREA"
         ? `Creato mezzo "${m.targa || m.id}"`
         : campi.length === 1
-          ? `Mezzo "${m.targa}": ${campi[0].campo} → ${campi[0].a}`
-          : `Modificato mezzo "${m.targa || m.id}" (${campi.length} campi)`,
+          ? `Mezzo "${m.targa}": ${campi[0].campo} ${campi[0].da} → ${campi[0].a}`
+          : `Mezzo "${m.targa}": ${campi.map(c => `${c.campo} → ${c.a}`).join(" · ")}`,
       currentUser,
       campi,
     });
-  }, [saveMezzo, mezzi, addLogEntry, currentUser]);
+    notify("Mezzo salvato!");
+  }, [saveMezzo, mezzi, addLogEntry, currentUser, notify]);
 
   const handleDeleteMezzo = useCallback(async (id) => {
     const m = mezzi?.find(x => x.id === id);
-    await deleteMezzo(id);
+    try { await deleteMezzo(id); } catch (e) { notify("Errore: " + e.message, "error"); return; }
     addLogEntry({
       sezione: "mezzi", azione: "ELIMINA",
       entita_id: id, entita_nome: m?.targa || id,
       descrizione: `Eliminato mezzo "${m?.targa || id}"`,
       currentUser, campi: [],
     });
-  }, [deleteMezzo, mezzi, addLogEntry, currentUser]);
+    notify("Mezzo eliminato");
+  }, [deleteMezzo, mezzi, addLogEntry, currentUser, notify]);
 
 
 // ── SOSTITUISCI handleSavePalmare ─────────────────────────────────────────────
+  const handleAddNewPalmare = () => {
+    const p = {
+      id:              "PALM_" + Date.now(),
+      seriale:         "",
+      modello:         "",
+      modello_custom:  "",
+      stato:           "DISPONIBILE",
+      padroncino_id:   "",
+      tariffa_mensile: 0,
+      data_assegnazione: "",
+      data_fine:       "",
+      note:            "",
+      storico:         [],
+      documenti:       [],
+      imei:            "",
+      sim:             "",
+      numero_sim:      "",
+      firmware:        "",
+      data_acquisto:   "",
+      fornitore:       "",
+    };
+    // Usa handleSavePalmare → registra nel log globale come CREA
+    handleSavePalmare(p, []);
+    // Apri direttamente il dettaglio del nuovo palmare
+    // (setDetailId verrà trovato dopo il reload del DB, ma il notify è sufficiente)
+  };
 
   const handleSavePalmare = useCallback(async (p, nuoviLog = []) => {
     const az = palmari?.find(x => x.id === p.id) ? "MODIFICA" : "CREA";
-    try { await savePalmare(p); } catch (e) { console.error("[savePalmare]", e); throw e; }
+    try { await savePalmare(p); } catch (e) { notify("Errore palmare: " + e.message, "error"); return; }
 
     const campi = (nuoviLog || []).map(s => ({ campo: s.campo, da: s.da, a: s.a }));
-
     if (az === "MODIFICA" && campi.length === 0) return;
 
     addLogEntry({
@@ -336,33 +363,56 @@ const AppInner = () => {
       descrizione: az === "CREA"
         ? `Creato palmare "${p.seriale || p.id}"`
         : campi.length === 1
-          ? `Palmare "${p.seriale}": ${campi[0].campo} → ${campi[0].a}`
-          : `Modificato palmare "${p.seriale || p.id}" (${campi.length} campi)`,
+          ? `Palmare "${p.seriale}": ${campi[0].campo} ${campi[0].da} → ${campi[0].a}`
+          : `Palmare "${p.seriale}": ${campi.map(c => `${c.campo} → ${c.a}`).join(" · ")}`,
       currentUser,
       campi,
     });
-  }, [savePalmare, palmari, addLogEntry, currentUser]);
+    notify("Palmare salvato!");
+  }, [savePalmare, palmari, addLogEntry, currentUser, notify]);
 
   const handleDeletePalmare = useCallback(async (id) => {
     const p = palmari?.find(x => x.id === id);
-    await deletePalmare(id);
+    try { await deletePalmare(id); } catch (e) { notify("Errore: " + e.message, "error"); return; }
     addLogEntry({
       sezione: "palmari", azione: "ELIMINA",
       entita_id: id, entita_nome: p?.seriale || id,
       descrizione: `Eliminato palmare "${p?.seriale || id}"`,
       currentUser, campi: [],
     });
-  }, [deletePalmare, palmari, addLogEntry, currentUser]);
+    notify("Palmare eliminato");
+  }, [deletePalmare, palmari, addLogEntry, currentUser, notify]);
 
 
 // ── SOSTITUISCI handleSaveCodAutista ─────────────────────────────────────────
-
+  const handleAddNewCodAutista = () => {
+    const a = {
+      id:              "COD_" + Date.now(),
+      codice:          "",
+      stato:           "DISPONIBILE",
+      padroncino_id:   "",
+      note:            "",
+      storico:         [],
+      documenti:       [],
+      tariffa_fissa:   0,
+      tariffa_ritiro:  0,
+      target:          "",
+      data_inizio:     "",
+      data_fine:       "",
+      contratto:       "",
+      numero_badge:    "",
+      patente:         "",
+      scad_patente:    "",
+    };
+    // Usa handleSaveCodAutista → registra nel log globale come CREA
+    handleSaveCodAutista(a, []);
+  };
+  
   const handleSaveCodAutista = useCallback(async (a, nuoviLog = []) => {
     const az = codAutisti?.find(x => x.id === a.id) ? "MODIFICA" : "CREA";
-    try { await saveCodAutista(a); } catch (e) { console.error("[saveCodAutista]", e); throw e; }
+    try { await saveCodAutista(a); } catch (e) { notify("Errore codice: " + e.message, "error"); return; }
 
     const campi = (nuoviLog || []).map(s => ({ campo: s.campo, da: s.da, a: s.a }));
-
     if (az === "MODIFICA" && campi.length === 0) return;
 
     addLogEntry({
@@ -373,39 +423,25 @@ const AppInner = () => {
       descrizione: az === "CREA"
         ? `Creato codice autista "${a.codice || a.id}"`
         : campi.length === 1
-          ? `Codice "${a.codice}": ${campi[0].campo} → ${campi[0].a}`
-          : `Modificato codice autista "${a.codice || a.id}" (${campi.length} campi)`,
+          ? `Cod. "${a.codice}": ${campi[0].campo} ${campi[0].da} → ${campi[0].a}`
+          : `Cod. "${a.codice}": ${campi.map(c => `${c.campo} → ${c.a}`).join(" · ")}`,
       currentUser,
       campi,
     });
-  }, [saveCodAutista, codAutisti, addLogEntry, currentUser]);
+    notify("Codice autista salvato!");
+  }, [saveCodAutista, codAutisti, addLogEntry, currentUser, notify]);
 
   const handleDeleteCodAutista = useCallback(async (id) => {
     const a = codAutisti?.find(x => x.id === id);
-    await deleteCodAutista(id);
+    try { await deleteCodAutista(id); } catch (e) { notify("Errore: " + e.message, "error"); return; }
     addLogEntry({
       sezione: "codici", azione: "ELIMINA",
       entita_id: id, entita_nome: a?.codice || id,
       descrizione: `Eliminato codice autista "${a?.codice || id}"`,
       currentUser, campi: [],
     });
-  }, [deleteCodAutista, codAutisti, addLogEntry, currentUser]);
-
-  const handleSaveConteggioLogged = useCallback(async (c) => {
-    try {
-      await handleSaveConteggio(c);
-      const pad = padroncini?.find(p => p.id === c.padroncino_id);
-      addLogEntry({
-        sezione:     "conteggi",
-        azione:      "MODIFICA",
-        entita_id:   c.padroncino_id,
-        entita_nome: `${pad?.nome || c.padroncino_id} — ${c.mese} ${c.anno}`,
-        descrizione: `Salvato conteggio ${c.mese} ${c.anno} per "${pad?.nome || c.padroncino_id}"`,
-        currentUser,
-        campi: [],
-      });
-    } catch (e) { notify("Errore nel salvataggio: " + e.message, "error"); }
-  }, [handleSaveConteggio, padroncini, addLogEntry, currentUser, notify]);
+    notify("Codice eliminato");
+  }, [deleteCodAutista, codAutisti, addLogEntry, currentUser, notify]);
 
   // Nav items filtrati per permessi
   const navItems = [
@@ -608,11 +644,23 @@ const AppInner = () => {
               ricariche={ricariche || {}} mezziFlotta={mezzi || []}
             />
           )}
-          {view === "mezzi"       && <MezziView mezzi={mezzi || []} padroncini={padroncini} onSave={handleSaveMezzo} onDelete={handleDeleteMezzo} onAddNew={handleAddNewMezzo} utente={currentUser?.nome || currentUser?.username || ""} />}
+          {view === "mezzi"       && <MezziView
+            mezzi={mezzi || []} padroncini={padroncini}
+            onSave={handleSaveMezzo} onDelete={handleDeleteMezzo} onAddNew={handleAddNewMezzo}
+            utente={currentUser?.nome || currentUser?.username || ""}
+          />}
           {view === "ricariche"   && <RicaricheView ricariche={ricariche || {}} onSave={saveRicaricheMese} mezzi={mezzi || []} padroncini={padroncini || []} mese={mese} anno={anno} onSaveMezzo={saveMezzo} />}
           {view === "ricerca"     && <RicercaGlobale padroncini={padroncini} conteggi={conteggi} />}
-          {view === "palmari"    && <PalmariView palmari={palmari || []} padroncini={padroncini} onSave={handleSavePalmare} onDelete={handleDeletePalmare} onAddNew={handleAddNewPalmare} utente={currentUser?.nome || currentUser?.username || ""} />}
-          {view === "cod_autisti" && <CodAutistiView codAutisti={codAutisti || []} onSave={handleSaveCodAutista} onDelete={handleDeleteCodAutista} onAddNew={handleAddNewCodAutista} utente={currentUser?.nome || currentUser?.username || ""} />}
+          {view === "palmari"    && <PalmariView
+            palmari={palmari || []} padroncini={padroncini}
+            onSave={handleSavePalmare} onDelete={handleDeletePalmare} onAddNew={handleAddNewPalmare}
+            utente={currentUser?.nome || currentUser?.username || ""}
+          />}
+          {view === "cod_autisti" && <CodAutistiView
+            codAutisti={codAutisti || []} padroncini={padroncini}
+            onSave={handleSaveCodAutista} onDelete={handleDeleteCodAutista} onAddNew={handleAddNewCodAutista}
+            utente={currentUser?.nome || currentUser?.username || ""}
+          />}
           {view === "export"      && <ExportView mese={mese} anno={anno} />}
           {view === "impostazioni"&& <ImpostazioniView onReload={reload} addebitiStandard={addebitiStandard} onSaveAddebitiStandard={saveAddebitiStandard} />}
           {view === "utenti"      && isAdmin && <GestioneUtenti />}

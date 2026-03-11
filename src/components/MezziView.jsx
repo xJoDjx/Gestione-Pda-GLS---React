@@ -44,23 +44,41 @@ const DaysLeft = ({ scad }) => {
 };
 
 // ─── STORICO HELPERS ──────────────────────────────────────────────────────────
-const CAMPI_STORICO = [
-  ["stato",             "Stato"],
-  ["padroncino_id",     "Padroncino"],
-  ["autista",           "Autista"],
-  ["km_attuale",        "KM"],
-  ["scad_assicurazione","Scad. Assicurazione"],
-  ["scad_revisione",    "Scad. Revisione"],
-  ["scad_bollo",        "Scad. Bollo"],
-  ["scad_tachigrafo",   "Scad. Tachigrafo"],
-  ["rata_noleggio",     "Rata Noleggio"],
-  ["canone_noleggio",   "Canone Noleggio"],
+const CAMPI_MEZZO = [
+  ["targa",              "Targa"],
+  ["stato",              "Stato"],
+  ["categoria",          "Categoria"],
+  ["padroncino_id",      "Padroncino"],
+  ["autista",            "Autista"],
+  ["tipo",               "Tipo"],
+  ["marca",              "Marca"],
+  ["modello",            "Modello"],
+  ["anno_imm",           "Anno immatricolazione"],
+  ["tipo_cassone",       "Tipo cassone"],
+  ["alimentazione",      "Alimentazione"],
+  ["colore",             "Colore"],
+  ["targa_rimorchio",    "Targa rimorchio"],
+  ["portata_kg",         "Portata (kg)"],
+  ["volume_m3",          "Volume (m³)"],
+  ["km_attuale",         "KM"],
+  ["limitazioni_km",     "Limite KM contratto"],
+  ["scad_assicurazione", "Scad. Assicurazione"],
+  ["scad_revisione",     "Scad. Revisione"],
+  ["scad_bollo",         "Scad. Bollo"],
+  ["scad_tachigrafo",    "Scad. Tachigrafo"],
+  ["proprietario",       "Proprietario"],
+  ["data_inizio",        "Data inizio"],
+  ["data_fine",          "Data fine"],
+  ["rata_noleggio",      "Rata Noleggio"],
+  ["canone_noleggio",    "Canone Noleggio"],
+  ["maggiorazione_ricarica_pct", "Magg. ricarica %"],
+  ["note_veicolo",       "Note veicolo"],
 ];
 
-const buildStorico = (vecchio, nuovo, padroncini=[], utente="") => {
-  const oggi = new Date().toLocaleDateString("it-IT");
+const buildStorico = (vecchio, nuovo, padroncini = [], utente = "") => {
   const ts   = new Date().toISOString();
-  return CAMPI_STORICO.reduce((acc, [campo, label]) => {
+  const oggi = new Date().toLocaleDateString("it-IT");
+  return CAMPI_MEZZO.reduce((acc, [campo, label]) => {
     const vOld = String(vecchio[campo] ?? "");
     const vNew = String(nuovo[campo]  ?? "");
     if (vOld === vNew) return acc;
@@ -70,10 +88,13 @@ const buildStorico = (vecchio, nuovo, padroncini=[], utente="") => {
       da = padroncini.find(p => p.id === vOld)?.nome || (vOld ? vOld : "Nessuno");
       a  = padroncini.find(p => p.id === vNew)?.nome || (vNew ? vNew : "Nessuno");
     }
-    if (campo === "km_attuale" && vNew && vNew !== "0")
-      a = Number(vNew).toLocaleString("it-IT") + " km";
-    if ((campo === "rata_noleggio" || campo === "canone_noleggio")) {
-      da = euro(parseFloat(vOld)||0); a = euro(parseFloat(vNew)||0);
+    if (campo === "km_attuale" || campo === "limitazioni_km") {
+      if (vNew && vNew !== "0") a  = Number(vNew).toLocaleString("it-IT") + " km";
+      if (vOld && vOld !== "0") da = Number(vOld).toLocaleString("it-IT") + " km";
+    }
+    if (campo === "rata_noleggio" || campo === "canone_noleggio") {
+      da = `€ ${parseFloat(vOld || 0).toFixed(2)}`;
+      a  = `€ ${parseFloat(vNew || 0).toFixed(2)}`;
     }
     acc.push({ ts, data: oggi, campo: label, da, a, utente });
     return acc;
@@ -83,7 +104,6 @@ const buildStorico = (vecchio, nuovo, padroncini=[], utente="") => {
 // ─── DETTAGLIO MEZZO ─────────────────────────────────────────────────────────
 const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete, utente = "" }) => {
   const [form, setForm] = useState({ ...mezzo });
-  const baseline = useRef({ ...mezzo });
   const [activeTab, setActiveTab] = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
   const [notaTesto, setNotaTesto] = useState("");
@@ -99,14 +119,11 @@ const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete, utente = "" 
 
   // ── BUG FIX: salva usando `form` (stato aggiornato), confronta con `mezzo` (prop iniziale)
   const handleSave = () => {
-    const nuoviLog = buildStorico(baseline.current, form, padroncini, utente);
-    const formConStorico = { ...form, storico: [...(form.storico || []), ...nuoviLog] };
-    // FIX 1: aggiorna il punto di riferimento SOLO dopo il save
-    baseline.current = { ...formConStorico };
-    // FIX 2: aggiorna form locale → storico nel tab visibile immediatamente
-    setForm(formConStorico);
-    // FIX 3: passa i nuovi log come secondo argomento
-    onSave(formConStorico, nuoviLog);
+    // `mezzo` prop è il punto di riferimento (aggiornato dal DB ad ogni save)
+    const nuoviLog = buildStorico(mezzo, form, padroncini, utente);
+    const saved = { ...form, storico: [...(form.storico || []), ...nuoviLog] };
+    setForm(saved);           // visibile immediatamente nel tab
+    onSave(saved, nuoviLog);  // nuoviLog al parent per il log globale
   };
 
   // ── Gestione documenti ──
@@ -514,10 +531,13 @@ const MezzoDetail = ({ mezzo, padroncini, onSave, onBack, onDelete, utente = "" 
 
 // ─── VISTA PRINCIPALE MEZZI ──────────────────────────────────────────────────
 export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew, utente = "" }) => {
-  const [search, setSearch]           = useState("");
+  const [search, setSearch]                 = useState("");
   const [filtroStato,    setFiltroStato]    = useState("TUTTI");
   const [filtroCategoria, setFiltroCategoria] = useState("");
-  const [detailMezzo, setDetailMezzo] = useState(null);
+  const [detailId, setDetailId]             = useState(null);
+
+  // Sempre fresco da DB
+  const detailMezzo = detailId ? mezzi.find(m => m.id === detailId) : null;
 
   if (detailMezzo) {
     return (
@@ -525,12 +545,9 @@ export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew, utent
         mezzo={detailMezzo}
         padroncini={padroncini}
         utente={utente}
-        onBack={()=>setDetailMezzo(null)}
-        onSave={(m, nuoviLog)=>{
-          onSave(m, nuoviLog);
-          setDetailMezzo(m);
-        }}
-        onDelete={(id)=>{ if(window.confirm("Eliminare questo mezzo?")){ onDelete(id); setDetailMezzo(null); } }}
+        onBack={() => setDetailId(null)}
+        onSave={(saved, nuoviLog) => { onSave(saved, nuoviLog); }}
+        onDelete={id => { if (window.confirm("Eliminare questo mezzo?")) { onDelete(id); setDetailId(null); } }}
       />
     );
   }
@@ -646,7 +663,7 @@ export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew, utent
                     {m.canone_noleggio>0&&<div style={{ fontFamily:"'DM Mono',monospace",fontSize:10,color:"#94a3b8" }}>costo: {euro(m.canone_noleggio)}</div>}
                   </td>
                   <td style={{ padding:"11px 12px",borderBottom:"1px solid #f1f5f9" }}>
-                    <button onClick={()=>setDetailMezzo(m)} style={{ padding:"5px 12px",borderRadius:7,background:"#eff6ff",border:"1px solid #bfdbfe",color:"#1d4ed8",fontSize:12,fontWeight:600,cursor:"pointer" }}>Dettaglio</button>
+                    <button onClick={()=>setDetailId(m.id)} style={{ padding:"5px 12px",borderRadius:7,background:"#eff6ff",border:"1px solid #bfdbfe",color:"#1d4ed8",fontSize:12,fontWeight:600,cursor:"pointer" }}>Dettaglio</button>
                   </td>
                 </tr>
               );

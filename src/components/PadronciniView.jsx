@@ -28,9 +28,9 @@ export const PadronciniView = ({
         mezziFlotta={mezzi}
         palmariFlotta={palmariGlobali}
         onSaveMezzoFlotta={onSaveMezzo}
-        onSavePalmare={onSavePalmare}
+        onSavePalmare={handleSavePalmare}
         codAutistiFlotta={codAutistiGlobali}
-        onSaveCodAutista={onSaveCodAutista}
+        onSaveCodAutista={handleSaveCodAutista}
       />
     );
   }
