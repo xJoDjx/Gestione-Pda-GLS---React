@@ -7,7 +7,7 @@ import { euro, durcColor, dvrColor, statoColor, durcDaysLeft } from "../utils/fo
 export const PadronciniView = ({
   padroncini, conteggi, mezzi = [], palmariGlobali = [], codAutistiGlobali = [],
   onSave, onSaveConteggio, onSaveMezzo, onDelete, onAddNew, onLogChange,
-  onSavePalmare, onSaveCodAutista,
+  onSavePalmare, onSaveCodAutista, utente = "",
 }) => {
   const [search, setSearch] = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
@@ -28,9 +28,10 @@ export const PadronciniView = ({
         mezziFlotta={mezzi}
         palmariFlotta={palmariGlobali}
         onSaveMezzoFlotta={onSaveMezzo}
-        onSavePalmare={handleSavePalmare}
+        onSavePalmare={onSavePalmare}
         codAutistiFlotta={codAutistiGlobali}
-        onSaveCodAutista={handleSaveCodAutista}
+        onSaveCodAutista={onSaveCodAutista}
+        utente={utente}
       />
     );
   }

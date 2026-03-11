@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { euro } from "../utils/formatters";
 
 // ─── COSTANTI ─────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ const Sel = ({ label, value, onChange, options }) => (
 
 // ─── STORICO builder ──────────────────────────────────────────────────────────
 // BUG 3 FIX: traccia tutti i campi rilevanti + documenti aggiunto/rimosso
-const CAMPI_AUTISTI = [
+const TRACK = [
   ["codice",         "Codice"],
   ["stato",          "Stato"],
   ["padroncino_id",  "Padroncino"],
@@ -38,20 +38,16 @@ const CAMPI_AUTISTI = [
   ["data_inizio",    "Data inizio"],
   ["data_fine",      "Data fine"],
   ["note",           "Note"],
-  ["contratto",      "Contratto"],
-  ["numero_badge",   "Numero badge"],
-  ["patente",        "Patente"],
-  ["scad_patente",   "Scad. patente"],
 ];
 
-const buildStorico = (vecchio, nuovo, pads = [], utente = "") => {
+const buildStorico = (old, neo, pads = []) => {
   const ts   = new Date().toISOString();
   const data = new Date().toLocaleDateString("it-IT");
   const log  = [];
 
-  CAMPI_AUTISTI.forEach(([k, label]) => {
-    const vo = String(vecchio[k] ?? "");
-    const vn = String(nuovo[k]  ?? "");
+  TRACK.forEach(([k, label]) => {
+    const vo = String(old[k] ?? "");
+    const vn = String(neo[k] ?? "");
     if (vo === vn) return;
     let da = vo || "—", a = vn || "—";
     if (k === "padroncino_id") {
@@ -59,23 +55,168 @@ const buildStorico = (vecchio, nuovo, pads = [], utente = "") => {
       a  = pads.find(p => p.id === vn)?.nome || (vn ? vn : "Nessuno");
     }
     if (k === "tariffa_fissa" || k === "tariffa_ritiro") {
-      da = da !== "—" ? `€ ${parseFloat(da || 0).toFixed(2)}` : "—";
-      a  = a  !== "—" ? `€ ${parseFloat(a  || 0).toFixed(2)}` : "—";
+      da = euro(parseFloat(vo) || 0);
+      a  = euro(parseFloat(vn) || 0);
     }
-    log.push({ ts, data, campo: label, da, a, utente });
+    log.push({ ts, data, campo: label, da, a });
   });
 
   // Documenti aggiunti/rimossi
-  const docsOld = (vecchio.documenti || []).map(d => d.nome || d.id).filter(Boolean);
-  const docsNew = (nuovo.documenti   || []).map(d => d.nome || d.id).filter(Boolean);
+  const docsOld = (old.documenti || []).map(d => d.nome || d.id).filter(Boolean);
+  const docsNew = (neo.documenti || []).map(d => d.nome || d.id).filter(Boolean);
   docsNew.filter(n => !docsOld.includes(n)).forEach(n =>
-    log.push({ ts, data, campo: "Documento aggiunto", da: "—", a: n, utente })
+    log.push({ ts, data, campo: "Documento aggiunto", da: "—", a: n })
   );
   docsOld.filter(n => !docsNew.includes(n)).forEach(n =>
-    log.push({ ts, data, campo: "Documento rimosso", da: n, a: "—", utente })
+    log.push({ ts, data, campo: "Documento rimosso", da: n, a: "—" })
   );
 
   return log;
+};
+
+
+
+// ─── STORICO TABELLA (design uniforme per Mezzi, Palmari, Cod Autisti) ───────
+const STILE_AZ = {
+  Assegnazione:   { bg:"#dcfce7", color:"#166534", border:"#bbf7d0", dot:"#22c55e" },
+  Rimozione:      { bg:"#fee2e2", color:"#dc2626", border:"#fecaca", dot:"#ef4444" },
+  Riassegnazione: { bg:"#fef3c7", color:"#92400e", border:"#fde68a", dot:"#f59e0b" },
+  Modifica:       { bg:"#dbeafe", color:"#1d4ed8", border:"#bfdbfe", dot:"#3b82f6" },
+  Nota:           { bg:"#fef9c3", color:"#854d0e", border:"#fde68a", dot:"#f59e0b" },
+};
+
+const getAzStorico = (entry) => {
+  if (entry.manuale) return "Nota";
+  const c = entry.campo || "";
+  if (c === "Assegnazione" || c === "Padroncino") {
+    const da = entry.da || ""; const a = entry.a || "";
+    if (!da || da === "—" || da === "Nessuno") return "Assegnazione";
+    if (!a  || a  === "—" || a  === "Nessuno") return "Rimozione";
+    return "Riassegnazione";
+  }
+  return "Modifica";
+};
+
+const fmtTsStorico = (ts) => {
+  if (!ts) return "—";
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString("it-IT") + "  " + d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  } catch { return ts; }
+};
+
+const StoricoTabella = ({ storico=[], entitaNome="", onAddNota, accentColor="#1e40af" }) => {
+  const [notaCampo, setNotaCampo] = useState("");
+  const [notaTesto, setNotaTesto] = useState("");
+  const rows = [...storico].reverse();
+
+  return (
+    <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e2e8f0", overflow:"hidden" }}>
+      {/* Header */}
+      <div style={{ padding:"16px 20px", borderBottom:"1px solid #e2e8f0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:800, color:"#0f172a" }}>📜 Storico — {entitaNome}</div>
+          <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{storico.length} eventi · aggiornamento in tempo reale</div>
+        </div>
+      </div>
+
+      {/* Nota manuale */}
+      <div style={{ padding:"10px 16px", background:"#f8fafc", borderBottom:"1px solid #e2e8f0", display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+        <input value={notaCampo} onChange={e=>setNotaCampo(e.target.value)}
+          placeholder="Tipo nota (es. Riparazione, Incidente...)"
+          style={{ width:220, padding:"6px 10px", borderRadius:7, border:"1px solid #e2e8f0", fontSize:12, background:"#fff" }} />
+        <input value={notaTesto} onChange={e=>setNotaTesto(e.target.value)}
+          placeholder="Descrizione nota..."
+          style={{ flex:1, minWidth:200, padding:"6px 10px", borderRadius:7, border:"1px solid #e2e8f0", fontSize:12, background:"#fff" }} />
+        <button onClick={()=>{ if(!notaTesto.trim())return; onAddNota(notaCampo, notaTesto); setNotaCampo(""); setNotaTesto(""); }}
+          style={{ padding:"6px 16px", borderRadius:7, background:accentColor, color:"#fff", border:"none", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+          + Nota
+        </button>
+      </div>
+
+      {storico.length === 0 ? (
+        <div style={{ padding:"48px 20px", textAlign:"center", color:"#94a3b8" }}>
+          <div style={{ fontSize:32, marginBottom:10 }}>📜</div>
+          <div style={{ fontSize:13 }}>Nessuna modifica ancora registrata</div>
+          <div style={{ fontSize:11, marginTop:4 }}>Salva dopo aver modificato stato, assegnazione o altri campi</div>
+        </div>
+      ) : (
+        <>
+          {/* Intestazioni */}
+          <div style={{ display:"grid", gridTemplateColumns:"160px 150px 130px 1fr", background:"#f8fafc", borderBottom:"2px solid #e2e8f0", padding:"8px 16px" }}>
+            {["DATA / ORA","UTENTE","AZIONE","DESCRIZIONE"].map(h=>(
+              <div key={h} style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.07em" }}>{h}</div>
+            ))}
+          </div>
+
+          {/* Righe */}
+          <div style={{ maxHeight:460, overflowY:"auto" }}>
+            {rows.map((entry, i) => {
+              const az  = getAzStorico(entry);
+              const st  = STILE_AZ[az] || STILE_AZ["Modifica"];
+              const utenteStr = entry.utente || "";
+
+              // Descrizione inline
+              let descrizione = "";
+              if (entry.manuale) {
+                const tipo = entry.campo && entry.campo !== "Nota manuale" ? `[${entry.campo}] ` : "";
+                descrizione = tipo + (entry.a || "");
+              } else {
+                const da = entry.da || "—"; const a = entry.a || "—";
+                descrizione = `${entry.campo}: ${da} → ${a}`;
+              }
+
+              return (
+                <div key={i} style={{
+                  display:"grid", gridTemplateColumns:"160px 150px 130px 1fr",
+                  padding:"10px 16px", alignItems:"center",
+                  background: i%2===0 ? "#fff" : "#fafbfc",
+                  borderBottom:"1px solid #f1f5f9",
+                }}>
+                  {/* Data/Ora */}
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#64748b", lineHeight:1.5, whiteSpace:"nowrap" }}>
+                    {fmtTsStorico(entry.ts)}
+                  </div>
+
+                  {/* Utente */}
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    {utenteStr ? (
+                      <>
+                        <div style={{ width:26, height:26, borderRadius:"50%", background:"linear-gradient(135deg,#3b82f6,#8b5cf6)", color:"#fff", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                          {utenteStr[0].toUpperCase()}
+                        </div>
+                        <span style={{ fontSize:12, fontWeight:700, color:"#0f172a" }}>{utenteStr}</span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize:12, color:"#94a3b8" }}>—</span>
+                    )}
+                  </div>
+
+                  {/* Azione badge */}
+                  <div>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"3px 10px", borderRadius:6, fontSize:11, fontWeight:700, background:st.bg, color:st.color, border:`1px solid ${st.border}` }}>
+                      <span style={{ width:6, height:6, borderRadius:"50%", background:st.dot, flexShrink:0, display:"inline-block" }}/>
+                      {az}
+                    </span>
+                  </div>
+
+                  {/* Descrizione */}
+                  <div style={{ fontSize:12, color:"#374151", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={descrizione}>
+                    {descrizione}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding:"8px 16px", background:"#f8fafc", borderTop:"1px solid #e2e8f0", fontSize:11, color:"#94a3b8" }}>
+            {storico.length} eventi registrati
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 // ─── HELPER apertura file (BUG 4) ─────────────────────────────────────────────
@@ -109,9 +250,8 @@ const salvaFile = async (d) => {
 };
 
 // ─── DETTAGLIO ────────────────────────────────────────────────────────────────
-const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete, utente = "" }) => {
+const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => {
   const [form,      setForm]      = useState({ ...autista });
-  const baseline = useRef({ ...autista });  // FIX 1
   const [tab,       setTab]       = useState("info");
   const [notaCampo, setNotaCampo] = useState("");
   const [notaTesto, setNotaTesto] = useState("");
@@ -139,11 +279,9 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete, utent
         ? (form.stato === "DISPONIBILE" ? "ASSEGNATO" : form.stato)
         : (form.stato === "ASSEGNATO"   ? "DISPONIBILE" : form.stato),
     };
-    // autista (prop) è sempre fresco da DB — usato come baseline
-    const nuoviLog = buildStorico(autista, formFinal, padroncini, utente);
-    const saved = { ...formFinal, storico: [...(form.storico || []), ...nuoviLog] };
-    setForm(saved);           // visibilità immediata nel tab storico
-    onSave(saved, nuoviLog);  // passa nuoviLog al parent
+    const log   = buildStorico(autista, formFinal, padroncini);
+    const saved = { ...formFinal, storico: [...storico, ...log] };
+    onSave(saved);
   };
 
   // ── Gestione documenti ────────────────────────────────────────────────────
@@ -301,112 +439,27 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete, utent
 
       {/* ═══ STORICO ═══ */}
       {tab === "storico" && (
-        <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e2e8f0", overflow:"hidden" }}>
-          <div style={{ padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid #f1f5f9" }}>
-            <div>
-              <div style={{ fontSize:13, fontWeight:800, color:"#0f172a" }}>📜 Storico — {form.codice || "—"}</div>
-              <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{(form.storico||[]).length} eventi · aggiornamento in tempo reale</div>
-            </div>
-            {(form.storico||[]).length > 0 && (
-              <button onClick={() => { if(window.confirm("Cancellare lo storico?")) { setForm(f => ({...f,storico:[]})); baseline.current = {...baseline.current, storico:[]}; }}}
-                style={{ padding:"6px 12px", borderRadius:7, background:"#fee2e2", color:"#dc2626", border:"none", fontSize:11, fontWeight:700, cursor:"pointer" }}>Cancella</button>
-            )}
-          </div>
-
-          {/* Nota manuale */}
-          <div style={{ padding:"10px 16px", background:"#f8fafc", borderBottom:"1px solid #e2e8f0" }}>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              <input value={notaCampo} onChange={e => setNotaCampo(e.target.value)} placeholder="Tipo nota (Cambio numero, Info...)"
-                style={{ width:210, padding:"6px 10px", borderRadius:7, border:"1px solid #e2e8f0", fontSize:12, background:"#fff" }} />
-              <input value={notaTesto} onChange={e => setNotaTesto(e.target.value)} placeholder="Descrizione nota..."
-                style={{ flex:1, minWidth:180, padding:"6px 10px", borderRadius:7, border:"1px solid #e2e8f0", fontSize:12, background:"#fff" }} />
-              <button onClick={() => {
-                if (!notaTesto.trim()) return;
-                const nota = { ts:new Date().toISOString(), data:new Date().toLocaleDateString("it-IT"), campo:notaCampo.trim()||"Nota", da:"—", a:notaTesto.trim(), utente, manuale:true };
-                setForm(f => ({ ...f, storico:[...(f.storico||[]), nota] }));
-                setNotaCampo(""); setNotaTesto("");
-              }} style={{ padding:"6px 16px", borderRadius:7, background:"#f59e0b", color:"#fff", border:"none", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                + Nota
-              </button>
-            </div>
-          </div>
-
-          {(form.storico||[]).length === 0 ? (
-            <div style={{ padding:"50px 20px", textAlign:"center", color:"#94a3b8" }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>📜</div>
-              <div style={{ fontSize:13 }}>Nessuna modifica registrata</div>
-            </div>
-          ) : (
-            <>
-              <div style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", background:"#f8fafc", borderBottom:"2px solid #e2e8f0", padding:"8px 16px" }}>
-                {["Data / Ora","Utente","Azione","Descrizione"].map(h => (
-                  <div key={h} style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.07em" }}>{h}</div>
-                ))}
-              </div>
-              <div style={{ maxHeight:420, overflowY:"auto" }}>
-                {[...(form.storico||[])].reverse().map((e, i) => {
-                  const isManuale = e.manuale;
-                  const isPad     = e.campo === "Padroncino";
-                  const isStato   = e.campo === "Stato";
-                  const isDoc     = (e.campo||"").toLowerCase().includes("documento");
-                  const azione    = isManuale?"Nota":isPad?"Assegnazione":isStato?"Cambio Stato":isDoc?"Documento":"Modifica";
-                  const acMeta = {
-                    "Nota":         { bg:"#f5f3ff", color:"#6d28d9", dot:"#8b5cf6" },
-                    "Assegnazione": { bg:"#fef3c7", color:"#92400e", dot:"#f59e0b" },
-                    "Cambio Stato": { bg:"#fffbeb", color:"#854d0e", dot:"#f59e0b" },
-                    "Documento":    { bg:"#ecfdf5", color:"#065f46", dot:"#10b981" },
-                    "Modifica":     { bg:"#eff6ff", color:"#1d4ed8", dot:"#3b82f6" },
-                  }[azione] || { bg:"#f1f5f9", color:"#374151", dot:"#94a3b8" };
-
-                  const descrizione = isManuale
-                    ? `${e.campo !== "Nota" ? e.campo+": " : ""}${e.a}`
-                    : isPad
-                      ? (e.a && e.a !== "—" && e.a !== "Nessuno"
-                          ? `Assegnato al padroncino "${e.a}"`
-                          : `Rimosso dal padroncino "${e.da}"`)
-                      : isDoc
-                        ? (e.campo.includes("aggiunto") ? `Aggiunto: ${e.a}` : `Rimosso: ${e.da}`)
-                        : `${e.campo}: ${e.da||"—"} → ${e.a||"—"}`;
-
-                  const dt = e.ts ? new Date(e.ts) : null;
-                  const dataOra = dt
-                    ? dt.toLocaleDateString("it-IT")+" "+dt.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"})
-                    : (e.data||"—");
-
-                  return (
-                    <div key={i} style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", padding:"9px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"#fff":"#fafbfc", alignItems:"center" }}>
-                      <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#64748b", lineHeight:1.4 }}>{dataOra}</div>
-                      <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                        {e.utente ? (
-                          <>
-                            <div style={{ width:22, height:22, borderRadius:"50%", background:"#f59e0b", color:"#fff", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                              {e.utente[0].toUpperCase()}
-                            </div>
-                            <div style={{ fontSize:11, fontWeight:600, color:"#374151" }}>{e.utente}</div>
-                          </>
-                        ) : <div style={{ fontSize:11, color:"#94a3b8" }}>—</div>}
-                      </div>
-                      <div>
-                        <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:5, fontSize:10, fontWeight:700, background:acMeta.bg, color:acMeta.color }}>
-                          <span style={{ width:5, height:5, borderRadius:"50%", background:acMeta.dot, display:"inline-block" }} />
-                          {azione}
-                        </span>
-                      </div>
-                      <div style={{ fontSize:12, color:"#374151", wordBreak:"break-word" }}>{descrizione}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        <StoricoTabella
+          storico={storico}
+          entitaNome={form.codice}
+          accentColor="#f59e0b"
+          onAddNota={(campo, testo) => {
+            set("storico", [...storico, {
+              ts: new Date().toISOString(),
+              data: new Date().toLocaleDateString("it-IT"),
+              campo: campo.trim() || "Nota manuale",
+              da: "—", a: testo.trim(), manuale: true
+            }]);
+          }}
+        />
       )}
-    </div>
+
+        </div>
   );
 };
 
 // ─── LISTA ────────────────────────────────────────────────────────────────────
-export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDelete, onAddNew, utente = "" }) => {
+export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDelete, onAddNew }) => {
   const [search,      setSearch]      = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detailId,    setDetailId]    = useState(null);
@@ -418,24 +471,17 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
       <CodAutistaDetail
         autista={detailAutista}
         padroncini={padroncini}
-        utente={utente}
         onBack={() => setDetailId(null)}
-        onSave={(a, nuoviLog) => { onSave(a, nuoviLog); }}
+        onSave={a => { onSave(a); }}
         onDelete={id => { onDelete(id); setDetailId(null); }}
       />
     );
   }
 
   const filtered = codAutisti.filter(a => {
-    const s = search.toLowerCase().trim();
-    const pad = padroncini.find(p => p.id === a.padroncino_id);
-    const matchSearch = !s || [
-      a.codice, a.stato, a.contratto,
-      a.numero_badge, a.patente, a.note,
-      a.target,
-      pad?.nome,
-    ].some(v => v && String(v).toLowerCase().includes(s));
-    return matchSearch && (filtroStato === "TUTTI" || a.stato === filtroStato);
+    const s = search.toLowerCase();
+    return (!s || a.codice?.toLowerCase().includes(s) || a.note?.toLowerCase().includes(s))
+      && (filtroStato === "TUTTI" || a.stato === filtroStato);
   });
 
   return (

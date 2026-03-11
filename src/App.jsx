@@ -188,42 +188,9 @@ const AppInner = () => {
       notify("Padroncino salvato!");
     } catch (e) {
       notify("Errore nel salvataggio: " + e.message, "error");
-      return;
     }
-    // Estrai i campi modificati dall'ultima voce di cronologia
-    const cron = p.cronologia || [];
-    const lastEntry = cron[cron.length - 1];
-    const campiRaw  = lastEntry?.campi || [];
-    const campi = campiRaw.map(c => ({
-      campo: c.label || c.campo || "",
-      da:    c.da    || "—",
-      a:     c.a     || "—",
-    }));
-
-    const az = padroncini?.find(x => x.id === p.id) ? "MODIFICA" : "CREA";
-    if (az === "MODIFICA" && campi.length === 0) return; // nessuna modifica reale rilevata
-
-    let desc = "";
-    if (az === "CREA") {
-      desc = `Creato padroncino "${p.nome}"`;
-    } else if (campi.length === 1) {
-      desc = `"${p.nome}": ${campi[0].campo} → ${campi[0].a}`;
-    } else if (campi.length > 1) {
-      desc = `"${p.nome}": ${campi.map(c => `${c.campo} → ${c.a}`).join(" · ")}`;
-    } else {
-      desc = `Modificato "${p.nome}"`;
-    }
-
-    addLogEntry({
-      sezione:     "padroncini",
-      azione:      az,
-      entita_id:   p.id,
-      entita_nome: p.nome || p.id,
-      descrizione: desc,
-      currentUser,
-      campi,
-    });
-  }, [savePadroncino, padroncini, addLogEntry, currentUser, notify]);
+    // Il log globale viene scritto esclusivamente via onLogChange (evita doppia registrazione)
+  }, [savePadroncino, notify]);
 
   const handleDeletePadroncino = useCallback(async (id) => {
     try {
@@ -242,6 +209,7 @@ const AppInner = () => {
     } catch (e) { notify("Errore eliminazione: " + e.message, "error"); }
   }, [deletePadroncino, padroncini, notify, addLogEntry, currentUser]);
 
+  // FIX BUG 2: handleSaveConteggio (era erroneamente chiamata handleSaveConteggioLogged nel JSX)
   const handleSaveConteggio = useCallback(async (c) => {
     try { await saveConteggio(c); notify("Conteggio salvato!"); }
     catch (e) { notify("Errore nel salvataggio: " + e.message, "error"); }
@@ -319,8 +287,6 @@ const AppInner = () => {
     notify("Mezzo eliminato");
   }, [deleteMezzo, mezzi, addLogEntry, currentUser, notify]);
 
-
-// ── SOSTITUISCI handleSavePalmare ─────────────────────────────────────────────
   const handleAddNewPalmare = () => {
     const p = {
       id:              "PALM_" + Date.now(),
@@ -342,12 +308,10 @@ const AppInner = () => {
       data_acquisto:   "",
       fornitore:       "",
     };
-    // Usa handleSavePalmare → registra nel log globale come CREA
     handleSavePalmare(p, []);
-    // Apri direttamente il dettaglio del nuovo palmare
-    // (setDetailId verrà trovato dopo il reload del DB, ma il notify è sufficiente)
   };
 
+  // FIX BUG 1: handleSavePalmare definita correttamente in AppInner
   const handleSavePalmare = useCallback(async (p, nuoviLog = []) => {
     const az = palmari?.find(x => x.id === p.id) ? "MODIFICA" : "CREA";
     try { await savePalmare(p); } catch (e) { notify("Errore palmare: " + e.message, "error"); return; }
@@ -383,8 +347,6 @@ const AppInner = () => {
     notify("Palmare eliminato");
   }, [deletePalmare, palmari, addLogEntry, currentUser, notify]);
 
-
-// ── SOSTITUISCI handleSaveCodAutista ─────────────────────────────────────────
   const handleAddNewCodAutista = () => {
     const a = {
       id:              "COD_" + Date.now(),
@@ -404,10 +366,9 @@ const AppInner = () => {
       patente:         "",
       scad_patente:    "",
     };
-    // Usa handleSaveCodAutista → registra nel log globale come CREA
     handleSaveCodAutista(a, []);
   };
-  
+
   const handleSaveCodAutista = useCallback(async (a, nuoviLog = []) => {
     const az = codAutisti?.find(x => x.id === a.id) ? "MODIFICA" : "CREA";
     try { await saveCodAutista(a); } catch (e) { notify("Errore codice: " + e.message, "error"); return; }
@@ -443,7 +404,6 @@ const AppInner = () => {
     notify("Codice eliminato");
   }, [deleteCodAutista, codAutisti, addLogEntry, currentUser, notify]);
 
-  // Nav items filtrati per permessi
   const navItems = [
     { id: "dashboard",    label: "Dashboard",            icon: "dashboard",   show: canAccess("dashboard") },
     { id: "padroncini",   label: "Padroncini",           icon: "users",       show: canAccess("padroncini") },
@@ -456,8 +416,7 @@ const AppInner = () => {
     { id: "export",       label: "Esportazione",         icon: "export",      show: true },
     { id: "impostazioni", label: "Impostazioni",         icon: "settings",    show: isAdmin },
     { id: "utenti",       label: "Gestione Utenti",      icon: "users",       show: isAdmin },
-    { id: "log_storico", label: "Log Storico",  icon: "list",    show: isAdmin },
-    
+    { id: "log_storico",  label: "Log Storico",          icon: "list",        show: isAdmin },
   ].filter(n => n.show);
 
   if (loading) return (
@@ -495,7 +454,6 @@ const AppInner = () => {
 
       {/* SIDEBAR */}
       <aside style={{ width: 220, background: "#0f172a", display: "flex", flexDirection: "column", flexShrink: 0, boxShadow: "4px 0 20px rgba(0,0,0,0.15)" }}>
-        {/* Logo */}
         <div style={{ padding: "20px 18px 16px", borderBottom: "1px solid #1e293b" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ background: "#f59e0b", borderRadius: 10, padding: "6px 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -508,7 +466,6 @@ const AppInner = () => {
           </div>
         </div>
 
-        {/* Nav */}
         <nav style={{ flex: 1, padding: "10px 10px", overflowY: "auto" }}>
           {navItems.map(item => (
             <button key={item.id} onClick={() => setView(item.id)}
@@ -528,7 +485,6 @@ const AppInner = () => {
           ))}
         </nav>
 
-        {/* Stato mese + utente */}
         <div style={{ padding: "12px 14px", borderTop: "1px solid #1e293b" }}>
           <div style={{ fontSize: 10, color: "#475569", marginBottom: 6, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Stato Mese</div>
           {(() => {
@@ -548,7 +504,6 @@ const AppInner = () => {
               </div>
             );
           })()}
-          {/* Utente loggato */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8, borderTop: "1px solid #1e293b" }}>
             <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
               {(currentUser?.nome || currentUser?.username || "U")[0].toUpperCase()}
@@ -568,7 +523,6 @@ const AppInner = () => {
 
       {/* MAIN CONTENT */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Header */}
         <header style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{navItems.find(n => n.id === view)?.label || view}</span>
@@ -599,7 +553,6 @@ const AppInner = () => {
           </div>
         </header>
 
-        {/* Views — overflow: auto per scroll */}
         <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
           {view === "dashboard"    && <DashboardView padroncini={padroncini} conteggi={conteggi} mezzi={mezzi || []} onNavigate={setView} />}
           {view === "padroncini"   && (
@@ -607,33 +560,50 @@ const AppInner = () => {
               padroncini={padroncini} conteggi={conteggi} mezzi={mezzi || []}
               palmariGlobali={palmari || []} codAutistiGlobali={codAutisti || []}
               onSave={handleSavePadroncino}
-              onSaveConteggio={handleSaveConteggio}       // ← FIX 2: era handleSaveConteggioLogged
-              onSaveMezzo={handleSaveMezzo}               // ← usa handler con log
+              utente={currentUser?.nome || currentUser?.username || ""}
+              onSaveConteggio={handleSaveConteggio}
+              onSaveMezzo={handleSaveMezzo}
               onDelete={handleDeletePadroncino}
-              onSavePalmare={handleSavePalmare}           // ← FIX 1: era savePalmare (raw)
-              onSaveCodAutista={handleSaveCodAutista}     // ← usa handler con log
+              onSavePalmare={handleSavePalmare}
+              onSaveCodAutista={handleSaveCodAutista}
               onAddNew={handleAddNew}
-              onLogChange={(nuovoForm, tipo, vecchioForm) => {
-                const WATCH_PAD = [
-                  ["nome","Nome"],["codice","Codice"],["stato","Stato"],
-                  ["durc_stato","DURC Stato"],["durc_scadenza","DURC Scadenza"],
-                  ["dvr_stato","DVR Stato"],["dvr_scadenza","DVR Scadenza"],
-                ];
-                const campi = WATCH_PAD.reduce((acc,[k,label]) => {
-                  const vo = String(vecchioForm?.[k] ?? ""), vn = String(nuovoForm?.[k] ?? "");
-                  if (vo !== vn) acc.push({ campo: label, da: vo||"—", a: vn||"—" });
-                  return acc;
-                },[]);
-                const azione = tipo?.includes("Crea") ? "CREA" : (tipo?.includes("Elimina") ? "ELIMINA" : "MODIFICA");
-                const entry = {
-                  azione,
-                  campi,
-                  utente:  currentUser?.nome || currentUser?.username || "Sistema",
-                  ts:      new Date().toISOString(),
-                };
-                const updated = { ...nuovoForm, cronologia: [...(nuovoForm.cronologia || []), entry] };
-                handleSavePadroncino(updated, vecchioForm, azione);
-                // Il wrapper handleSavePadroncino (PATCH 3) si occupa del log globale.
+              onLogChange={(formSaved, campiDiff) => {
+                // PadroncinoDetail ha già calcolato il diff — qui scriviamo solo il log globale.
+                if (!campiDiff?.length) return;
+
+                // Rileva tipo azione dal primo campo
+                const primoLabel = (campiDiff[0]?.label || "").toLowerCase();
+                const isAssegn   = primoLabel.includes("assegnat");
+                const isRimoss   = primoLabel.includes("rimoss");
+                const isNuovo    = !padroncini?.find(x => x.id === formSaved.id);
+
+                const az = isNuovo ? "CREA" : isAssegn ? "ASSEGNAZIONE" : isRimoss ? "RIMOZIONE" : "MODIFICA";
+
+                // Descrizione leggibile
+                let desc;
+                if (az === "CREA") {
+                  desc = `Creato padroncino "${formSaved.nome}"`;
+                } else if (isAssegn || isRimoss) {
+                  // es. "Mezzo assegnato" → valore è la targa/seriale/codice
+                  const cosa  = campiDiff[0].label.replace(/ assegnato| rimosso/i, "").trim();
+                  const valore = isAssegn ? campiDiff[0].a : campiDiff[0].da;
+                  const verbo  = isAssegn ? "assegnato" : "rimosso";
+                  desc = `${cosa} ${valore} ${verbo} ${isAssegn ? "a" : "da"} "${formSaved.nome}"`;
+                } else {
+                  desc = campiDiff.length === 1
+                    ? `"${formSaved.nome}": ${campiDiff[0].label} → ${campiDiff[0].a}`
+                    : `"${formSaved.nome}": ${campiDiff.map(c => `${c.label} → ${c.a}`).join(" · ")}`;
+                }
+
+                addLogEntry({
+                  sezione:     "padroncini",
+                  azione:      az,
+                  entita_id:   formSaved.id,
+                  entita_nome: formSaved.nome || formSaved.id,
+                  descrizione: desc,
+                  currentUser,
+                  campi: campiDiff.map(c => ({ campo: c.label, da: c.da, a: c.a })),
+                });
               }}
             />
           )}
@@ -641,7 +611,7 @@ const AppInner = () => {
             <ConteggiEditor
               padroncini={padroncini} conteggi={conteggi}
               mese={mese} anno={anno}
-              onSave={handleSaveConteggioLogged}
+              onSave={handleSaveConteggio}
               onDelete={deleteConteggio}
               addebiti_standard={addebitiStandard}
               ricariche={ricariche || {}} mezziFlotta={mezzi || []}

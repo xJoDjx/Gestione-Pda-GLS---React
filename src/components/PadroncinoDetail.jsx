@@ -3,6 +3,34 @@ import { Icon } from "./Icons";
 import { Badge, SectionCard, DocUpload } from "./BaseComponents";
 import { euro, durcColor, dvrColor, statoColor, durcDaysLeft, MESI } from "../utils/formatters";
 
+// ─── CAMPI MONITORATI per cronologia (tutti i campi significativi) ─────────────
+const WATCH_FIELDS = [
+  ["nome",            "Ragione Sociale"],
+  ["codice",          "Codice GLS"],
+  ["stato",           "Stato"],
+  ["partita_iva",     "Partita IVA"],
+  ["codice_fiscale",  "Codice Fiscale"],
+  ["rappresentante",  "Rappresentante"],
+  ["telefono",        "Telefono"],
+  ["email",           "Email"],
+  ["sede_legale",     "Sede Legale"],
+  ["via_sede_legale", "Via/Sede Operativa"],
+  ["durc_stato",      "DURC Stato"],
+  ["durc_scadenza",   "DURC Scadenza"],
+  ["dvr_stato",       "DVR Stato"],
+  ["dvr_scadenza",    "DVR Scadenza"],
+  ["note_varie",      "Note"],
+];
+
+// Helper: crea entry storico/cronologia
+const makeEntry = (logCampi, utente = "") => ({
+  ts:     new Date().toISOString(),
+  data:   new Date().toLocaleDateString("it-IT"),
+  tipo:   "Modifica",
+  campi:  logCampi,
+  utente,
+});
+
 // ─── STILI CELLE ──────────────────────────────────────────────────────────────
 const ci = {
   width: "100%", padding: "5px 7px", border: "1px solid #e2e8f0",
@@ -28,25 +56,18 @@ const TD = ({ children, center, w }) => (
   }}>{children}</td>
 );
 
-// ─── BUG 4 FIX: apertura file con app nativa ──────────────────────────────────
+// ─── Apertura file nativo ──────────────────────────────────────────────────────
 const isElectron = typeof window !== "undefined" && !!window.electronAPI;
 
 const apriFileNativo = async (doc) => {
-  // Supporta sia doc.data che doc.data_b64
   const base64 = doc?.data || doc?.data_b64;
   const nome   = doc?.name || doc?.nome || "documento";
   if (!base64) return;
   if (isElectron && window.electronAPI.openFile) {
-    try {
-      await window.electronAPI.openFile(base64, nome);
-    } catch (e) {
-      // fallback download
-      const a = document.createElement("a");
-      a.href = base64; a.download = nome; a.click();
-    }
+    try { await window.electronAPI.openFile(base64, nome); }
+    catch { const a = document.createElement("a"); a.href = base64; a.download = nome; a.click(); }
   } else {
-    const a = document.createElement("a");
-    a.href = base64; a.download = nome; a.click();
+    const a = document.createElement("a"); a.href = base64; a.download = nome; a.click();
   }
 };
 
@@ -56,26 +77,25 @@ const salvaFileSuDisco = async (doc) => {
   if (isElectron && window.electronAPI.saveFile) {
     await window.electronAPI.saveFile(base64, nome);
   } else {
-    const a = document.createElement("a");
-    a.href = base64; a.download = nome; a.click();
+    const a = document.createElement("a"); a.href = base64; a.download = nome; a.click();
   }
 };
 
-// ─── DocBlock: mostra un documento con Apri/Rimuovi (BUG 4 FIX) ──────────────
+// ─── DocBlock ─────────────────────────────────────────────────────────────────
 const DocBlock = ({ label, docKey, form, update, accent = "#3b82f6" }) => {
   const doc = form[docKey];
+  const hasFile = !!(doc && (doc.data || doc.data_b64 || doc.name || doc.nome));
   return (
     <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", padding: "12px 14px" }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
         {label}
       </div>
-      {doc ? (
+      {hasFile ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ fontSize: 11, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "5px 8px", background: "#f8fafc", borderRadius: 6, border: "1px solid #e2e8f0" }}>
             📄 {doc.name || doc.nome}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            {/* BUG 4 FIX: usa apriFileNativo invece di window.open(doc.data) */}
             <button onClick={() => apriFileNativo(doc)}
               style={{ flex: 1, padding: "5px", borderRadius: 6, background: "#eff6ff", border: "none", color: "#1d4ed8", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
               🖥️ Apri
@@ -92,7 +112,7 @@ const DocBlock = ({ label, docKey, form, update, accent = "#3b82f6" }) => {
         </div>
       ) : (
         <label style={{ cursor: "pointer", display: "block" }}>
-          <div style={{ padding: "10px", borderRadius: 7, border: "2px dashed #e2e8f0", textAlign: "center", fontSize: 11, color: "#94a3b8", background: "#fafafa", transition: "all 0.15s" }}
+          <div style={{ padding: "10px", borderRadius: 7, border: "2px dashed #e2e8f0", textAlign: "center", fontSize: 11, color: "#94a3b8", background: "#fafafa" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = accent; e.currentTarget.style.color = accent; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.color = "#94a3b8"; }}>
             + Carica {label}
@@ -111,7 +131,7 @@ const DocBlock = ({ label, docKey, form, update, accent = "#3b82f6" }) => {
 };
 
 // ─── TAB MEZZI ────────────────────────────────────────────────────────────────
-const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAutoSave, padroncino_id = "" }) => {
+const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAutoSave, padroncino_id = "", padroncinoNome = "", utente = "" }) => {
   const rows = mezzi || [];
   const [showPicker, setShowPicker] = useState(false);
   const targheUsate = new Set(rows.map(m => m.targa).filter(Boolean));
@@ -124,9 +144,13 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
       onChange(newRows);
       if (onSaveMezzoFlotta && rimosso?.targa) {
         const globale = mezziFlotta.find(m => m.targa === rimosso.targa);
-        if (globale) onSaveMezzoFlotta({ ...globale, stato: "DISPONIBILE", padroncino_id: "" });
+        if (globale) {
+          const storEntry = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: "Assegnazione", da: padroncinoNome || padroncino_id, a: "Nessuno", utente };
+          onSaveMezzoFlotta({ ...globale, stato: "DISPONIBILE", padroncino_id: "", storico: [...(globale.storico || []), storEntry] });
+        }
       }
-      if (onAutoSave) onAutoSave(newRows, "mezzi");
+      const logCampi = rimosso?.targa ? [{ label: "Mezzo rimosso", da: rimosso.targa, a: "—" }] : [];
+      if (onAutoSave) onAutoSave(newRows, "mezzi", rows, logCampi);
       return;
     }
     if (field === "__ADD__") {
@@ -231,8 +255,12 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
                   data_fine: "", tariffa_mensile: m.rata_noleggio || 0, note: ""
                 }];
                 onChange(newRows);
-                if (onSaveMezzoFlotta) onSaveMezzoFlotta({ ...m, stato: "ASSEGNATO", padroncino_id });
-                if (onAutoSave) onAutoSave(newRows, "mezzi");
+                if (onSaveMezzoFlotta) {
+                  const storEntry = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: "Assegnazione", da: "Nessuno", a: padroncinoNome || padroncino_id, utente };
+                  onSaveMezzoFlotta({ ...m, stato: "ASSEGNATO", padroncino_id, storico: [...(m.storico || []), storEntry] });
+                }
+                const logCampi = [{ label: "Mezzo assegnato", da: "—", a: m.targa }];
+                if (onAutoSave) onAutoSave(newRows, "mezzi", rows, logCampi);
                 setShowPicker(false);
               }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #bfdbfe", color: "#1d4ed8", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{m.targa}</span>
@@ -247,7 +275,7 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
 };
 
 // ─── TAB PALMARI ──────────────────────────────────────────────────────────────
-const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAutoSave, padroncino_id = "" }) => {
+const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAutoSave, padroncino_id = "", padroncinoNome = "", utente = "" }) => {
   const rows = palmari || [];
   const [showPicker, setShowPicker] = useState(false);
   const serialiUsati = new Set(rows.map(p => p.seriale).filter(Boolean));
@@ -260,9 +288,13 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
       onChange(newRows);
       if (onSavePalmare && rimosso?.seriale) {
         const globale = palmariFlotta.find(f => f.seriale === rimosso.seriale);
-        if (globale) onSavePalmare({ ...globale, stato: "DISPONIBILE", padroncino_id: "" });
+        if (globale) {
+          const storEntry = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: "Assegnazione", da: padroncinoNome || padroncino_id, a: "Nessuno", utente };
+          onSavePalmare({ ...globale, stato: "DISPONIBILE", padroncino_id: "", storico: [...(globale.storico || []), storEntry] });
+        }
       }
-      if (onAutoSave) onAutoSave(newRows, "palmari");
+      const logCampi = rimosso?.seriale ? [{ label: "Palmare rimosso", da: rimosso.seriale, a: "—" }] : [];
+      if (onAutoSave) onAutoSave(newRows, "palmari", rows, logCampi);
       return;
     }
     if (field === "__ADD__") {
@@ -352,8 +384,12 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
                   note: p.modello || ""
                 }];
                 onChange(newRows);
-                if (onSavePalmare) onSavePalmare({ ...p, stato: "ASSEGNATO", padroncino_id });
-                if (onAutoSave) onAutoSave(newRows, "palmari");
+                if (onSavePalmare) {
+                  const storEntry = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: "Assegnazione", da: "Nessuno", a: padroncinoNome || padroncino_id, utente };
+                  onSavePalmare({ ...p, stato: "ASSEGNATO", padroncino_id, storico: [...(p.storico || []), storEntry] });
+                }
+                const logCampi = [{ label: "Palmare assegnato", da: "—", a: p.seriale }];
+                if (onAutoSave) onAutoSave(newRows, "palmari", rows, logCampi);
                 setShowPicker(false);
               }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #c4b5fd", color: "#6d28d9", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{p.seriale}</span>
@@ -367,8 +403,8 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
   );
 };
 
-// ─── TAB CODICI AUTISTI (con picker flotta) ────────────────────────────────────
-const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista, onAutoSave, padroncino_id = "" }) => {
+// ─── TAB CODICI AUTISTI ────────────────────────────────────────────────────────
+const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista, onAutoSave, padroncino_id = "", padroncinoNome = "", utente = "" }) => {
   const rows = autisti || [];
   const [showPicker, setShowPicker] = useState(false);
 
@@ -385,9 +421,13 @@ const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista
       onChange(newRows);
       if (onSaveCodAutista && rimosso?.codice) {
         const globale = codAutistiFlotta.find(f => f.codice === rimosso.codice);
-        if (globale) onSaveCodAutista({ ...globale, stato: "DISPONIBILE", padroncino_id: "" });
+        if (globale) {
+          const storEntry = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: "Assegnazione", da: padroncinoNome || padroncino_id, a: "Nessuno", utente };
+          onSaveCodAutista({ ...globale, stato: "DISPONIBILE", padroncino_id: "", storico: [...(globale.storico || []), storEntry] });
+        }
       }
-      if (onAutoSave) onAutoSave(newRows, "codici_autisti");
+      const logCampi = rimosso?.codice ? [{ label: "Cod. Autista rimosso", da: rimosso.codice, a: "—" }] : [];
+      if (onAutoSave) onAutoSave(newRows, "codici_autisti", rows, logCampi);
       return;
     }
     if (field === "__ADD__") {
@@ -474,8 +514,12 @@ const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista
                   data_fine: "", note: a.note || "", doc: null,
                 }];
                 onChange(newRows);
-                if (onSaveCodAutista) onSaveCodAutista({ ...a, stato: "ASSEGNATO", padroncino_id });
-                if (onAutoSave) onAutoSave(newRows, "codici_autisti");
+                if (onSaveCodAutista) {
+                  const storEntry = { ts: new Date().toISOString(), data: new Date().toLocaleDateString("it-IT"), campo: "Assegnazione", da: "Nessuno", a: padroncinoNome || padroncino_id, utente };
+                  onSaveCodAutista({ ...a, stato: "ASSEGNATO", padroncino_id, storico: [...(a.storico || []), storEntry] });
+                }
+                const logCampi = [{ label: "Cod. Autista assegnato", da: "—", a: a.codice }];
+                if (onAutoSave) onAutoSave(newRows, "codici_autisti", rows, logCampi);
                 setShowPicker(false);
               }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #fcd34d", color: "#78350f", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{a.codice}</span>
@@ -490,12 +534,155 @@ const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista
   );
 };
 
+
+// ─── CRONOLOGIA TAB (design tabella come storico mezzi) ──────────────────────
+const AZIONE_STILE = {
+  Assegnazione: { bg: "#dcfce7", color: "#166534", border: "#bbf7d0", dot: "#22c55e" },
+  Rimozione:    { bg: "#fee2e2", color: "#dc2626", border: "#fecaca", dot: "#ef4444" },
+  Modifica:     { bg: "#dbeafe", color: "#1d4ed8", border: "#bfdbfe", dot: "#3b82f6" },
+  "Nota manuale": { bg: "#fef9c3", color: "#854d0e", border: "#fde68a", dot: "#f59e0b" },
+};
+
+const getAzioneEntry = (entry) => {
+  if (entry.manuale) return "Nota manuale";
+  const labels = (entry.campi || []).map(c => (c.label || c.campo || "").toLowerCase()).join(" ");
+  if (labels.includes("assegnato") || labels.includes("assegnaz")) return "Assegnazione";
+  if (labels.includes("rimosso") || labels.includes("rimozione")) return "Rimozione";
+  return "Modifica";
+};
+
+const fmtTs = (ts) => {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleDateString("it-IT") + "  " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+};
+
+const CronologiaTab = ({ cronologia = [], onAddNota, padNome }) => {
+  const [notaCampo, setNotaCampo] = useState("");
+  const [notaTesto, setNotaTesto] = useState("");
+
+  const rows = [...cronologia].reverse();
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #e2e8f0" }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>📜 Log Modifiche — {padNome}</div>
+        <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{cronologia.length} eventi · aggiornamento in tempo reale</div>
+      </div>
+
+      {/* Nota manuale */}
+      <div style={{ padding: "10px 16px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={notaCampo} onChange={e => setNotaCampo(e.target.value)}
+          placeholder="Tipo nota (es. Chiamata, Accordo...)"
+          style={{ width: 220, padding: "6px 10px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 12, background: "#fff" }} />
+        <input value={notaTesto} onChange={e => setNotaTesto(e.target.value)}
+          placeholder="Descrizione nota..."
+          style={{ flex: 1, minWidth: 200, padding: "6px 10px", borderRadius: 7, border: "1px solid #e2e8f0", fontSize: 12, background: "#fff" }} />
+        <button onClick={() => { if (!notaTesto.trim()) return; onAddNota(notaCampo, notaTesto); setNotaCampo(""); setNotaTesto(""); }}
+          style={{ padding: "6px 16px", borderRadius: 7, background: "#1e40af", color: "#fff", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+          + Nota
+        </button>
+      </div>
+
+      {cronologia.length === 0 ? (
+        <div style={{ padding: "48px 20px", textAlign: "center", color: "#94a3b8" }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>📜</div>
+          <div style={{ fontSize: 13 }}>Nessuna modifica ancora registrata</div>
+          <div style={{ fontSize: 11, marginTop: 4 }}>Ogni salvataggio, assegnazione e rimozione viene registrata automaticamente</div>
+        </div>
+      ) : (
+        <>
+          {/* Intestazioni */}
+          <div style={{ display: "grid", gridTemplateColumns: "160px 150px 130px 1fr", gap: 0, background: "#f8fafc", borderBottom: "2px solid #e2e8f0", padding: "8px 16px" }}>
+            {["DATA / ORA", "UTENTE", "AZIONE", "DESCRIZIONE"].map(h => (
+              <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</div>
+            ))}
+          </div>
+
+          {/* Righe */}
+          <div style={{ maxHeight: 440, overflowY: "auto" }}>
+            {rows.map((entry, i) => {
+              const az      = getAzioneEntry(entry);
+              const st      = AZIONE_STILE[az] || AZIONE_STILE["Modifica"];
+              const campi   = entry.campi || [];
+              const utenteStr = entry.utente || "";
+
+              // Costruisci la descrizione compatta
+              let descrizione = "";
+              if (az === "Assegnazione") {
+                const c = campi[0];
+                descrizione = c ? `${c.label || c.campo}: ${c.da} → ${c.a}` : "Assegnazione";
+              } else if (az === "Rimozione") {
+                const c = campi[0];
+                descrizione = c ? `${c.label || c.campo}: ${c.da} → ${c.a}` : "Rimozione";
+              } else if (entry.manuale) {
+                const c = campi[0];
+                const tipo = c?.label && c.label !== "Nota" ? `[${c.label}] ` : "";
+                descrizione = tipo + (c?.a || "");
+              } else {
+                descrizione = campi.map(c => `${c.label || c.campo}: ${c.da} → ${c.a}`).join(" · ");
+              }
+
+              return (
+                <div key={i} style={{
+                  display: "grid", gridTemplateColumns: "160px 150px 130px 1fr",
+                  gap: 0, padding: "10px 16px",
+                  background: i % 2 === 0 ? "#fff" : "#fafbfc",
+                  borderBottom: "1px solid #f1f5f9",
+                  alignItems: "center",
+                }}>
+                  {/* Data/Ora */}
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#64748b", lineHeight: 1.5, whiteSpace: "nowrap" }}>
+                    {fmtTs(entry.ts)}
+                  </div>
+
+                  {/* Utente */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {utenteStr ? (
+                      <>
+                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "linear-gradient(135deg,#3b82f6,#8b5cf6)", color: "#fff", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {utenteStr[0].toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{utenteStr}</span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>
+                    )}
+                  </div>
+
+                  {/* Azione badge */}
+                  <div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: st.dot, flexShrink: 0, display: "inline-block" }} />
+                      {az}
+                    </span>
+                  </div>
+
+                  {/* Descrizione */}
+                  <div style={{ fontSize: 12, color: "#374151", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={descrizione}>
+                    {descrizione}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding: "8px 16px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", fontSize: 11, color: "#94a3b8" }}>
+            {cronologia.length} eventi registrati
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── COMPONENTE PRINCIPALE ────────────────────────────────────────────────────
-// BUG 2 FIX: firma aggiornata con codAutistiFlotta + onSaveCodAutista
 export const PadroncinoDetail = ({
   padroncino, conteggi, onBack, onSave, onSaveConteggio, onLogChange,
   mezziFlotta = [], palmariFlotta = [], onSaveMezzoFlotta, onSavePalmare,
-  codAutistiFlotta = [], onSaveCodAutista,
+  codAutistiFlotta = [], onSaveCodAutista, utente = "",
 }) => {
   const [tab,   setTab]   = useState("anagrafica");
   const [form,  setForm]  = useState({ ...padroncino });
@@ -511,11 +698,31 @@ export const PadroncinoDetail = ({
     setDirty(true);
   };
 
-  // BUG 2 FIX: handleSave chiama onLogChange con padroncino originale per calcolare diff completo
+  // ── handleSave: calcola diff, aggiunge a cronologia, aggiorna state locale subito ──
   const handleSave = () => {
-    onSave(form);
+    // Build diff tra props originali e form attuale
+    const campiDiff = WATCH_FIELDS.reduce((acc, [k, label]) => {
+      const vo = String(padroncino[k] ?? "");
+      const vn = String(form[k] ?? "");
+      if (vo !== vn) acc.push({ label, da: vo || "—", a: vn || "—" });
+      return acc;
+    }, []);
+
+    let formToSave = form;
+    if (campiDiff.length > 0) {
+      const entry = makeEntry(campiDiff, utente);
+      formToSave = { ...form, cronologia: [...(form.cronologia || []), entry] };
+      // Aggiorna state locale subito → il tab "Log" si aggiorna senza uscire
+      setForm(formToSave);
+      formRef.current = formToSave;
+    }
+
+    onSave(formToSave);
     setDirty(false);
-    if (onLogChange) onLogChange(form, "Dati modificati", padroncino);
+
+    // Passa solo il diff precalcolato al gestore globale (non ricalcola nulla)
+    if (onLogChange && campiDiff.length > 0) onLogChange(formToSave, campiDiff);
+
     // Sincronizza palmari globali
     if (onSavePalmare && form.palmari) {
       form.palmari.forEach(p => {
@@ -538,6 +745,26 @@ export const PadroncinoDetail = ({
         }
       });
     }
+  };
+
+  // ── Helper onAutoSave usato da TabMezzi/TabPalmari/TabAutisti ──────────────
+  // logCampi: array di {label, da, a} che descrive cosa è cambiato
+  const handleAutoSave = (vals, campo, oldVals, logCampi = []) => {
+    const updated = { ...formRef.current, [campo]: vals };
+    let formToSave = updated;
+
+    if (logCampi.length > 0) {
+      const entry = makeEntry(logCampi, utente);
+      formToSave = { ...updated, cronologia: [...(updated.cronologia || []), entry] };
+    }
+
+    formRef.current = formToSave;
+    setForm(formToSave);
+    setDirty(false);
+    onSave(formToSave);
+
+    // Notifica log globale con campi significativi
+    if (onLogChange && logCampi.length > 0) onLogChange(formToSave, logCampi);
   };
 
   const padConteggi = conteggi.filter(c => c.padroncino_id === padroncino.id);
@@ -646,7 +873,6 @@ export const PadroncinoDetail = ({
             </div>
           </SectionCard>
 
-          {/* DOCUMENTI - BUG 4 FIX: usa DocBlock con apriFileNativo */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
             <DocBlock label="DURC" docKey="durc_doc" form={form} update={update} accent="#ef4444" />
             <DocBlock label="DVR" docKey="dvr_doc" form={form} update={update} accent="#f59e0b" />
@@ -673,13 +899,9 @@ export const PadroncinoDetail = ({
             mezziFlotta={mezziFlotta}
             onSaveMezzoFlotta={onSaveMezzoFlotta}
             padroncino_id={form.id}
-            onAutoSave={(vals, campo) => {
-              const updated = { ...formRef.current, [campo]: vals };
-              formRef.current = updated;
-              setForm(updated);
-              setDirty(false);
-              onSave(updated);
-            }}
+            padroncinoNome={form.nome}
+            utente={utente}
+            onAutoSave={handleAutoSave}
           />
         </SectionCard>
       )}
@@ -693,18 +915,14 @@ export const PadroncinoDetail = ({
             palmariFlotta={palmariFlotta}
             onSavePalmare={onSavePalmare}
             padroncino_id={form.id}
-            onAutoSave={(vals, campo) => {
-              const updated = { ...formRef.current, [campo]: vals };
-              formRef.current = updated;
-              setForm(updated);
-              setDirty(false);
-              onSave(updated);
-            }}
+            padroncinoNome={form.nome}
+            utente={utente}
+            onAutoSave={handleAutoSave}
           />
         </SectionCard>
       )}
 
-      {/* ══ AUTISTI (con picker flotta) ══ */}
+      {/* ══ AUTISTI ══ */}
       {tab === "autisti" && (
         <SectionCard title="Codici Autisti" icon="users" accent="#f59e0b">
           <TabAutisti
@@ -713,13 +931,9 @@ export const PadroncinoDetail = ({
             codAutistiFlotta={codAutistiFlotta}
             onSaveCodAutista={onSaveCodAutista}
             padroncino_id={form.id}
-            onAutoSave={(vals, campo) => {
-              const updated = { ...formRef.current, [campo]: vals };
-              formRef.current = updated;
-              setForm(updated);
-              setDirty(false);
-              onSave(updated);
-            }}
+            padroncinoNome={form.nome}
+            utente={utente}
+            onAutoSave={handleAutoSave}
           />
         </SectionCard>
       )}
@@ -816,114 +1030,25 @@ export const PadroncinoDetail = ({
 
       {/* ══ CRONOLOGIA / LOG ══ */}
       {tab === "cronologia" && (
-        <div style={{ background:"#fff", borderRadius:14, border:"1px solid #e2e8f0", overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
-          {/* Header */}
-          <div style={{ padding:"14px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid #f1f5f9" }}>
-            <div>
-              <div style={{ fontSize:13, fontWeight:800, color:"#0f172a" }}>📋 Log Modifiche — {form.nome}</div>
-              <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{(form.cronologia||[]).length} eventi · aggiornamento in tempo reale</div>
-            </div>
-            {(form.cronologia||[]).length > 0 && (
-              <button onClick={() => { if(window.confirm("Cancellare tutta la cronologia?")) update("cronologia", []); }}
-                style={{ padding:"6px 12px", borderRadius:7, background:"#fee2e2", color:"#dc2626", border:"none", fontSize:11, fontWeight:700, cursor:"pointer" }}>
-                Cancella
-              </button>
-            )}
-          </div>
-
-          {(form.cronologia||[]).length === 0 ? (
-            <div style={{ padding:"50px 20px", textAlign:"center", color:"#94a3b8" }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>📋</div>
-              <div style={{ fontSize:13 }}>Nessuna modifica registrata</div>
-            </div>
-          ) : (
-            <>
-              {/* Intestazioni */}
-              <div style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", background:"#f8fafc", borderBottom:"2px solid #e2e8f0", padding:"8px 16px" }}>
-                {["Data / Ora","Utente","Azione","Descrizione"].map(h => (
-                  <div key={h} style={{ fontSize:10, fontWeight:800, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.07em" }}>{h}</div>
-                ))}
-              </div>
-
-              <div style={{ maxHeight:500, overflowY:"auto" }}>
-                {[...(form.cronologia||[])].reverse().map((entry, i) => {
-                  // Ogni entry della cronologia padroncino ha: {ts, azione, campi:[], utente}
-                  // oppure vecchio formato con campi: [...] e nessun utente
-                  const campi   = Array.isArray(entry.campi) ? entry.campi : [];
-                  const azione  = entry.azione || "Modifica";
-                  const utente  = entry.utente || entry.username || "—";
-                  const dt      = entry.ts ? new Date(entry.ts) : null;
-                  const dataOra = dt
-                    ? dt.toLocaleDateString("it-IT")+" "+dt.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit",second:"2-digit"})
-                    : (entry.data || "—");
-
-                  // Costruisci descrizione dall'azione e dai campi
-                  const azioneDisplay = azione === "CREA" ? "Creazione" : azione === "ELIMINA" ? "Eliminazione" : azione === "MODIFICA" ? "Modifica" : azione;
-                  const acMeta = {
-                    "Creazione":   { bg:"#dcfce7", color:"#166534", dot:"#22c55e" },
-                    "Modifica":    { bg:"#dbeafe", color:"#1d4ed8", dot:"#3b82f6" },
-                    "Eliminazione":{ bg:"#fee2e2", color:"#dc2626", dot:"#ef4444" },
-                  }[azioneDisplay] || { bg:"#f1f5f9", color:"#374151", dot:"#94a3b8" };
-
-                  // Descrizione: usa campi se disponibili, altrimenti usa entry.descrizione
-                  let descrizione = entry.descrizione || "";
-                  if (!descrizione && campi.length > 0) {
-                    descrizione = campi.map(c => `${c.campo}: "${c.da||"—"}" → "${c.a||"—"}"`).join(" · ");
-                  }
-                  if (!descrizione) descrizione = "Nessun dettaglio";
-
-                  return (
-                    <div key={i}>
-                      <div style={{ display:"grid", gridTemplateColumns:"155px 130px 115px 1fr", padding:"9px 16px", borderBottom:"1px solid #f8fafc", background:i%2===0?"#fff":"#fafbfc", alignItems:"start" }}>
-                        {/* Data/Ora */}
-                        <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color:"#64748b", lineHeight:1.4, paddingTop:2 }}>{dataOra}</div>
-
-                        {/* Utente */}
-                        <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-                          {utente !== "—" ? (
-                            <>
-                              <div style={{ width:22, height:22, borderRadius:"50%", background:"#8b5cf6", color:"#fff", fontSize:10, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                                {utente[0].toUpperCase()}
-                              </div>
-                              <div style={{ fontSize:11, fontWeight:600, color:"#374151" }}>{utente}</div>
-                            </>
-                          ) : <div style={{ fontSize:11, color:"#94a3b8" }}>—</div>}
-                        </div>
-
-                        {/* Azione */}
-                        <div style={{ paddingTop:2 }}>
-                          <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:5, fontSize:10, fontWeight:700, background:acMeta.bg, color:acMeta.color }}>
-                            <span style={{ width:5, height:5, borderRadius:"50%", background:acMeta.dot, display:"inline-block" }} />
-                            {azioneDisplay}
-                          </span>
-                        </div>
-
-                        {/* Descrizione + dettaglio campi */}
-                        <div>
-                          <div style={{ fontSize:12, color:"#374151", wordBreak:"break-word" }}>
-                            {descrizione}
-                          </div>
-                          {campi.length > 1 && (
-                            <div style={{ marginTop:6, display:"flex", flexDirection:"column", gap:3 }}>
-                              {campi.map((c, ci) => (
-                                <div key={ci} style={{ display:"flex", gap:6, alignItems:"center", fontSize:11 }}>
-                                  <span style={{ fontWeight:700, color:"#64748b", minWidth:100 }}>{c.campo}</span>
-                                  <span style={{ background:"#fee2e2", color:"#991b1b", padding:"1px 6px", borderRadius:3, fontFamily:"'DM Mono',monospace", fontSize:10 }}>{c.da||"—"}</span>
-                                  <span style={{ color:"#94a3b8" }}>→</span>
-                                  <span style={{ background:"#dcfce7", color:"#166534", padding:"1px 6px", borderRadius:3, fontFamily:"'DM Mono',monospace", fontSize:10 }}>{c.a||"—"}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        <CronologiaTab
+          cronologia={form.cronologia || []}
+          padNome={form.nome}
+          onAddNota={(campo, testo) => {
+            if (!testo.trim()) return;
+            const entry = {
+              ts:     new Date().toISOString(),
+              data:   new Date().toLocaleDateString("it-IT"),
+              tipo:   "Nota manuale",
+              campi:  [{ label: campo.trim() || "Nota", da: "—", a: testo.trim() }],
+              utente,
+              manuale: true,
+            };
+            const updated = { ...form, cronologia: [...(form.cronologia || []), entry] };
+            setForm(updated);
+            formRef.current = updated;
+            onSave(updated);
+          }}
+        />
       )}
 
     </div>
