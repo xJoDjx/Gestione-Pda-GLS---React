@@ -552,10 +552,19 @@ export const MezziView = ({ mezzi, padroncini, onSave, onDelete, onAddNew, utent
     );
   }
 
-  const filtered = mezzi.filter(m=>{
-    const s=search.toLowerCase();
-    const match=!s||[m.targa,m.marca,m.modello,m.autista,m.proprietario,m.n_contratto].some(v=>v?.toLowerCase().includes(s));
-    return match && (filtroStato==="TUTTI"||m.stato===filtroStato) && (!filtroCategoria||(m.categoria||"DISTRIBUZIONE")===filtroCategoria);
+  const filtered = mezzi.filter(m => {
+    const s = search.toLowerCase().trim();
+    const pad = padroncini.find(p => p.id === m.padroncino_id);
+    const matchSearch = !s || [
+      m.targa, m.marca, m.modello, m.tipo, m.categoria, m.stato,
+      m.alimentazione, m.colore, m.autista, m.proprietario,
+      m.targa_rimorchio, m.tipo_cassone, m.note_veicolo,
+      m.scad_assicurazione, m.scad_revisione, m.scad_bollo, m.scad_tachigrafo,
+      pad?.nome,
+    ].some(v => v && String(v).toLowerCase().includes(s));
+    const matchStato = filtroStato === "TUTTI" || m.stato === filtroStato;
+    const matchCat   = !filtroCategoria || m.categoria === filtroCategoria;
+    return matchSearch && matchStato && matchCat;
   });
 
   const scadImm=filtered.filter(m=>{

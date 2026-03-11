@@ -403,10 +403,16 @@ export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete, onAdd
     );
   }
 
-  const filtered = palmari.filter(p=>{
-    const q=search.toLowerCase();
-    const ok=!q||[p.seriale,p.modello,p.modello_custom,p.note].some(v=>v?.toLowerCase().includes(q));
-    return ok&&(filtroStato==="TUTTI"||p.stato===filtroStato);
+  const filtered = palmari.filter(p => {
+    const s = search.toLowerCase().trim();
+    const pad = padroncini.find(x => x.id === p.padroncino_id);
+    const matchSearch = !s || [
+      p.seriale, p.modello, p.modello_custom, p.stato,
+      p.imei, p.sim, p.numero_sim, p.firmware,
+      p.fornitore, p.note,
+      pad?.nome,
+    ].some(v => v && String(v).toLowerCase().includes(s));
+    return matchSearch && (filtroStato === "TUTTI" || p.stato === filtroStato);
   });
 
   const totDisp    = palmari.filter(p=>p.stato==="DISPONIBILE").length;
