@@ -31,9 +31,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveRicaricheMese:     (mese, anno, data) => ipcRenderer.invoke("save-ricariche-mese", mese, anno, data),
 
   // ── Impostazioni ──────────────────────────────────────────────────────────
-  getSetting:       (k)     => ipcRenderer.invoke("get-setting",  k),
-  setSetting:       (k, v)  => ipcRenderer.invoke("set-setting",  k, v),
+  getSetting:       (k)     => ipcRenderer.invoke("get-setting",   k),
+  setSetting:       (k, v)  => ipcRenderer.invoke("set-setting",   k, v),
   getDbPath:        ()      => ipcRenderer.invoke("get-db-path"),
+  changeDbPath:     ()      => ipcRenderer.invoke("change-db-path"), 
 
   // ── Log Storico Globale ────────────────────────────────────────────────────
   saveLogEntry:  (entry)  => ipcRenderer.invoke("save-log-entry",  entry),

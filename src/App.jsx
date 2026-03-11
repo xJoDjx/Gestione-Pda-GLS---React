@@ -604,11 +604,14 @@ const AppInner = () => {
           {view === "dashboard"    && <DashboardView padroncini={padroncini} conteggi={conteggi} mezzi={mezzi || []} onNavigate={setView} />}
           {view === "padroncini"   && (
             <PadronciniView
-              padroncini={padroncini} conteggi={conteggi} mezzi={mezzi || []} palmariGlobali={palmari || []} codAutistiGlobali={codAutisti || []}
-              onSave={handleSavePadroncino} onSaveConteggio={handleSaveConteggio}
-              onSaveMezzo={saveMezzo} onDelete={handleDeletePadroncino}
-              onSavePalmare={savePalmare}              
-              onSaveCodAutista={saveCodAutista}
+              padroncini={padroncini} conteggi={conteggi} mezzi={mezzi || []}
+              palmariGlobali={palmari || []} codAutistiGlobali={codAutisti || []}
+              onSave={handleSavePadroncino}
+              onSaveConteggio={handleSaveConteggio}       // ← FIX 2: era handleSaveConteggioLogged
+              onSaveMezzo={handleSaveMezzo}               // ← usa handler con log
+              onDelete={handleDeletePadroncino}
+              onSavePalmare={handleSavePalmare}           // ← FIX 1: era savePalmare (raw)
+              onSaveCodAutista={handleSaveCodAutista}     // ← usa handler con log
               onAddNew={handleAddNew}
               onLogChange={(nuovoForm, tipo, vecchioForm) => {
                 const WATCH_PAD = [

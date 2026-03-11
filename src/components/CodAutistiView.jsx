@@ -427,9 +427,15 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
   }
 
   const filtered = codAutisti.filter(a => {
-    const s = search.toLowerCase();
-    return (!s || a.codice?.toLowerCase().includes(s) || a.note?.toLowerCase().includes(s))
-      && (filtroStato === "TUTTI" || a.stato === filtroStato);
+    const s = search.toLowerCase().trim();
+    const pad = padroncini.find(p => p.id === a.padroncino_id);
+    const matchSearch = !s || [
+      a.codice, a.stato, a.contratto,
+      a.numero_badge, a.patente, a.note,
+      a.target,
+      pad?.nome,
+    ].some(v => v && String(v).toLowerCase().includes(s));
+    return matchSearch && (filtroStato === "TUTTI" || a.stato === filtroStato);
   });
 
   return (
