@@ -16,6 +16,7 @@ export const durcColor = (s) => {
   if (s==="VALIDO")  return { bg:"#dcfce7", text:"#166534", border:"#86efac" };
   if (s==="SCADUTO") return { bg:"#fee2e2", text:"#991b1b", border:"#fca5a5" };
   if (s==="ESENTE")  return { bg:"#e0f2fe", text:"#0c4a6e", border:"#7dd3fc" };
+  if (s==="IN SCADENZA") return { bg:"#fef3c7", text:"#92400e", border:"#fde68a" };
   return { bg:"#f3f4f6", text:"#6b7280", border:"#d1d5db" };
 };
 export const dvrColor = durcColor;

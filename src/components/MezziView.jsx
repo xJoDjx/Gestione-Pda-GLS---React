@@ -426,10 +426,20 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
 
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
-      {/* Title */}
+      {/* Title 
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
         <h1 style={{ fontSize:20,fontWeight:800,color:"#0f172a",margin:0 }}>Flotta Mezzi</h1>
         <span style={{ fontSize:12,color:"#94a3b8" }}>{filtered.length} di {mezzi.length}</span>
+      </div>*/}
+
+
+
+      {/* KPI */}
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12 }}>
+        <KpiCard label="Totali" value={mezzi.length} icon="🚛" sub={`${mezzi.filter(m=>m.stato==="ASSEGNATO").length} assegnati`} />
+        <KpiCard label="Disponibili" value={mezzi.filter(m=>m.stato==="DISPONIBILE").length} icon="🚛" sub="pronti" />
+        <KpiCard label="Entrate Noleggio" value={euro(totEntrate)} icon="🚛" sub="mensile" />
+        <KpiCard label="Margine" value={euro(totMargine)} icon="🚛" sub="rata − canone" />
       </div>
 
       {/* Warning */}
@@ -439,14 +449,6 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
           <span style={{ fontSize:13,fontWeight:700,color:"#92400e" }}>{scadImm} mezzo/i con scadenze entro 30 giorni</span>
         </div>
       )}
-
-      {/* KPI */}
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12 }}>
-        <KpiCard label="Totali" value={mezzi.length} icon="🚛" sub={`${mezzi.filter(m=>m.stato==="ASSEGNATO").length} assegnati`} />
-        <KpiCard label="Disponibili" value={mezzi.filter(m=>m.stato==="DISPONIBILE").length} icon="🚛" sub="pronti" />
-        <KpiCard label="Entrate Noleggio" value={euro(totEntrate)} icon="🚛" sub="mensile" />
-        <KpiCard label="Margine" value={euro(totMargine)} icon="🚛" sub="rata − canone" />
-      </div>
 
       {/* Filtri */}
       <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
@@ -473,11 +475,11 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
       </div>
 
       {/* Tabella */}
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", overflow: "auto", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+        <table style={{ width: "100%", minWidth: "1100px", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f8fafc" }}>
-              {["Targa", "Marca/Modello", "Tipo", "Stato", "Padroncino", "Scad. Ass.", "Scad. Rev.", "Rata", "KM", ""].map(h => (
+              {["Targa", "Marca/Modello", "Tipo", "Stato", "Padroncino", "Scad. Ass.", "Scad. Rev.", "Rata", "KM Attuali", "Utilizzo KM", ""].map(h => (
                 <th key={h} style={{ 
                   textAlign: "left", 
                   padding: "10px 14px", 
@@ -529,31 +531,38 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
                     </div>
                   </td>
 
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9", fontSize: 12, color: "#64748b" }}>{m.tipo || "—"}</td>
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9", fontSize: 12, color: "#64748b" }}>{m.tipo || "—"}</td>
                   
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9" }}>
                     <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color }}>{m.stato || "—"}</span>
                   </td>
 
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9", fontSize: 12 }}>
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9", fontSize: 12 }}>
                     {pad ? <span style={{ fontWeight: 600, color: "#000000" }}>{pad.nome}</span> : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>—</span>}
                   </td>
 
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9" }}><DaysLeft scad={m.scad_assicurazione} /></td>
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9" }}><DaysLeft scad={m.scad_revisione} /></td>
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9" }}><DaysLeft scad={m.scad_assicurazione} /></td>
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9" }}><DaysLeft scad={m.scad_revisione} /></td>
                   
                   {/* RATA - Allineata a destra come l'header */}
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 700, color: "#000000", textAlign: "right" }}>
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 700, color: "#000000", textAlign: "left" }}>
                     {m.rata_noleggio ? euro(m.rata_noleggio) : "—"}
                   </td>
 
-                  {/* KM - Flex con justifyEnd per allinearsi a destra */}
-                  <td style={{ padding: "3px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                  {/* COLONNA 1: Solo KM Attuali */}
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 700, color: "#374151" }}>
+                    {m.km_attuale ? m.km_attuale.toLocaleString("it-IT") : "—"}
+                  </td>
+
+                  {/* COLONNA 2: Barra Percentuale con Tooltip */}
+                  <td style={{ padding: "7px 14px", borderBottom: "1px solid #f1f5f9" }}>
                     {percKmRow !== null ? (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px" }}>
-                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 700, color: "#374151", minWidth: "65px", textAlign: "left" }}>
-                          {(m.km_attuale || 0).toLocaleString("it-IT")}
-                        </div>
+                      <div 
+                        // TOOLTIP: Appare quando passi il mouse
+                        title={`Limite contratto: ${m.limitazioni_km?.toLocaleString("it-IT")} km`}
+                        style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "help" }}
+                      >
+                        {/* La Barra */}
                         <div style={{ background: "#e2e8f0", borderRadius: 4, height: 7, width: "80px", overflow: "hidden", flexShrink: 0 }}>
                           <div style={{ 
                             width: `${Math.min(percKmRow, 100)}%`, 
@@ -563,12 +572,20 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
                             transition: "width 0.3s" 
                           }}/>
                         </div>
-                        <div style={{ fontSize: 11, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: percKmRow > 90 ? "#dc2626" : percKmRow > 70 ? "#f59e0b" : "#166534", minWidth: "35px", textAlign: "left" }}>
+                        
+                        {/* Testo Percentuale */}
+                        <div style={{ 
+                          fontSize: 11, 
+                          fontWeight: 800, 
+                          fontFamily: "'DM Mono',monospace", 
+                          color: percKmRow > 90 ? "#dc2626" : percKmRow > 70 ? "#f59e0b" : "#166534",
+                          minWidth: "35px"
+                        }}>
                           {percKmRow}%
                         </div>
                       </div>
                     ) : (
-                      <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace", textAlign: "left" }}>—</div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Mono',monospace" }}>—</div>
                     )}
                   </td>
 

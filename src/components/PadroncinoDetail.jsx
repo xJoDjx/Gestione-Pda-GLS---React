@@ -861,7 +861,33 @@ export const PadroncinoDetail = ({
                   {["REGOLARE", "IN SCADENZA", "SCADUTO", "ASSENTE"].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
-              <div><label style={labelSt}>Scad. DURC</label><input type="date" value={form.durc_scadenza || ""} onChange={e => update("durc_scadenza", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div>
+                <label style={labelSt}>Scad. DURC</label>
+                <input 
+                  type="date" 
+                  value={form.durc_scadenza || ""} 
+                  onChange={e => {
+                    const nuovaData = e.target.value;
+                    update("durc_scadenza", nuovaData);
+
+                    if (nuovaData) {
+                      const dLeft = durcDaysLeft(nuovaData); // Uso la tua funzione esistente
+                      let nuovoStato = "REGOLARE";
+
+                      if (dLeft <= 0) {
+                        nuovoStato = "SCADUTO";
+                      } else if (dLeft <= 15) {
+                        nuovoStato = "IN SCADENZA";
+                      }
+
+                      update("durc_stato", nuovoStato);
+                    }
+                  }} 
+                  style={fieldCi} 
+                  onFocus={e => e.target.style.borderColor = "#3b82f6"} 
+                  onBlur={e => e.target.style.borderColor = "#e2e8f0"} 
+                />
+              </div>
               <div>
                 <label style={labelSt}>Stato DVR</label>
                 <select value={form.dvr_stato || ""} onChange={e => update("dvr_stato", e.target.value)} style={{ ...fieldCi, cursor: "pointer" }}>
