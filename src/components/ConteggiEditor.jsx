@@ -124,14 +124,14 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
   if (!selPad) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {/* Header Titolo */}
+        {/* Header Titolo 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h1 style={{ fontSize: 22, fontWeight: 900, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>Conteggi Mensili</h1>
           <div style={{ display: "flex", gap: 8 }}>
             <span style={{ padding: "4px 12px", borderRadius: 8, background: "#eff6ff", color: "#2563eb", fontSize: 12, fontWeight: 700 }}>{mese} {anno}</span>
             <span style={{ padding: "4px 12px", borderRadius: 8, background: "#f1f5f9", color: "#64748b", fontSize: 12, fontWeight: 600 }}>{giorni} giorni</span>
           </div>
-        </div>
+        </div>*/}
 
         {/* KPI Grid */}
         <div style={{ display: "flex", gap: 12 }}>
