@@ -37,8 +37,13 @@ const mergeConteggi = (base = [], override = []) => {
 // ─── Ricariche storage ────────────────────────────────────────────────────────
 const saveRicaricheStorage = async (data) => {
   if (isElectron) {
-    if (window.electronAPI.saveRicariche) { await window.electronAPI.saveRicariche(data); return; }
-    if (window.electronAPI.saveSettings)  { await window.electronAPI.saveSettings("ricariche", JSON.stringify(data)); return; }
+    // saveRicaricheMese(mese, anno, data) è l'unico handler reale nel preload/main
+    // Passiamo valori placeholder per mese/anno perché main.js ignora quei parametri
+    // e salva l'intero oggetto ricariche come JSON in settings
+    if (window.electronAPI.saveRicaricheMese) {
+      await window.electronAPI.saveRicaricheMese("__all__", 0, data);
+      return;
+    }
   }
   lsSet("gls_ricariche", data);
 };

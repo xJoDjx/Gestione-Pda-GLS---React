@@ -45,6 +45,37 @@ const KpiCard = ({ label, value, icon, sub }) => (
 );
 
 // ─── STORICO ──────────────────────────────────────────────────────────────────
+const CAMPI_STORICO_PALM = [
+  ["stato",             "Stato"],
+  ["padroncino_id",     "Padroncino"],
+  ["tariffa_mensile",   "Tariffa Mensile"],
+  ["data_assegnazione", "Data Assegnazione"],
+  ["data_fine",         "Data Fine"],
+  ["modello",           "Modello"],
+  ["imei",              "IMEI"],
+  ["sim",               "SIM"],
+  ["numero_sim",        "Numero SIM"],
+];
+
+const buildStoricoP = (vecchio, nuovo, padroncini = []) => {
+  const oggi = new Date().toLocaleDateString("it-IT");
+  const ts   = new Date().toISOString();
+  return CAMPI_STORICO_PALM.reduce((acc, [campo, label]) => {
+    const vOld = String(vecchio[campo] ?? "");
+    const vNew = String(nuovo[campo]  ?? "");
+    if (vOld === vNew) return acc;
+    let da = vOld || "—";
+    let a  = vNew || "—";
+    if (campo === "padroncino_id") {
+      da = padroncini.find(p => p.id === vOld)?.nome || (vOld ? vOld : "Nessuno");
+      a  = padroncini.find(p => p.id === vNew)?.nome || (vNew ? vNew : "Nessuno");
+    }
+    if (campo === "tariffa_mensile") { da = euro(parseFloat(vOld) || 0); a = euro(parseFloat(vNew) || 0); }
+    acc.push({ ts, data: oggi, campo: label, da, a });
+    return acc;
+  }, []);
+};
+
 const STILE_AZ = {
   Assegnazione:   { bg:"#dcfce7",color:"#166534",border:"#bbf7d0",dot:"#22c55e" },
   Rimozione:      { bg:"#fee2e2",color:"#dc2626",border:"#fecaca",dot:"#ef4444" },
@@ -132,7 +163,11 @@ const PalmareDetail = ({ palmare, padroncini, onBack, onSave }) => {
   const padAss   = padroncini.find(p=>p.id===form.padroncino_id);
   const sc       = STATO_STYLE[form.stato] || { bg:"#f3f4f6",color:"#6b7280" };
 
-  const handleSave = () => { if(onSave) onSave(form); };
+  const handleSave = () => {
+    const nuoviLog = buildStoricoP(palmare, form, padroncini);
+    const updated  = { ...form, storico: [...storico, ...nuoviLog] };
+    if (onSave) onSave(updated, nuoviLog);
+  };
 
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
@@ -227,14 +262,14 @@ const PalmareDetail = ({ palmare, padroncini, onBack, onSave }) => {
 };
 
 // ─── LISTA ────────────────────────────────────────────────────────────────────
-export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete }) => {
+export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete , onAddNew }) => {
   const [search,      setSearch]      = useState("");
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detail,      setDetail]      = useState(null);
 
   if (detail) {
     const fresh = palmari.find(p=>p.id===detail.id) || detail;
-    return <PalmareDetail palmare={fresh} padroncini={padroncini} onBack={()=>setDetail(null)} onSave={p=>{if(onSave)onSave(p); setDetail(null);}} />;
+    return <PalmareDetail palmare={fresh} padroncini={padroncini} onBack={()=>setDetail(null)} onSave={(p, nuoviLog)=>{if(onSave)onSave(p, nuoviLog); setDetail(null);}} />;
   }
 
   const filtered = palmari.filter(p => {
@@ -265,6 +300,9 @@ export const PalmariView = ({ palmari=[], padroncini=[], onSave, onDelete }) => 
         {["TUTTI",...STATI].map(s=>(
           <button key={s} onClick={()=>setFiltroStato(s)} style={{ padding:"7px 12px",borderRadius:8,border:"1px solid #e2e8f0",background:filtroStato===s?"#6d28d9":"#fff",color:filtroStato===s?"#fff":"#374151",fontSize:11,fontWeight:600,cursor:"pointer" }}>{s}</button>
         ))}
+        <button onClick={onAddNew} style={{ display:"flex",alignItems:"center",gap:5,padding:"8px 14px",borderRadius:8,background:"#6366f1",color:"#fff",border:"none",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap" }}>
+          <Icon name="plus" size={13}/> Nuovo Palmare
+        </button>
       </div>
 
       {/* Tabella */}

@@ -161,6 +161,8 @@ function runMigrations() {
    ["voci_fatturato","TEXT DEFAULT '[]'"],["dettagli_mezzi","TEXT DEFAULT '[]'"],
    ["n_palmari","INTEGER DEFAULT 0"],["note_spedizioni","TEXT DEFAULT ''"],
    ["note_proforma","TEXT DEFAULT ''"],["predefinite_loaded","INTEGER DEFAULT 0"],
+   ["voci_spedizioni","TEXT DEFAULT '[]'"],["voci_consegne_doppie","TEXT DEFAULT '[]'"],
+   ["voci_palmari","TEXT DEFAULT '[]'"],["voci_compensazioni_distribuzione","TEXT DEFAULT '[]'"],
   ].forEach(([c,d]) => addColumnIfMissing("conteggi", c, d));
 
   db.exec(`CREATE TABLE IF NOT EXISTS mezzi_flotta (
@@ -288,6 +290,7 @@ const JSON_FIELDS_PADRONCINI = [
 const JSON_FIELDS_CONTEGGI = [
   "altri_fatturato","voci_fatturato","ricariche_mezzi","ops_mese",
   "altri_addebiti","fatture_fine_mese","cassa_prima_nota","dettagli_mezzi",
+  "voci_spedizioni","voci_consegne_doppie","voci_palmari","voci_compensazioni_distribuzione",
 ];
 const JSON_FIELDS_MEZZI    = ["documenti","storico"];
 const JSON_FIELDS_PALMARI  = ["documenti","storico"];
