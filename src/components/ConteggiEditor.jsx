@@ -59,7 +59,7 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
   const totFatt = meseConteggi.reduce((s, c) => s + (c.totale_fattura || 0), 0);
   const totAdd  = meseConteggi.reduce((s, c) => s + (c.totale_addebiti || 0), 0);
   const totBon  = meseConteggi.reduce((s, c) => s + (c.totale_da_bonificare || 0), 0);
-  const completati = meseConteggi.filter(c => c.caricata_scadenziario).length;
+  const completati = meseConteggi.filter(c => c.distrib_inviata && c.pdf_addeb && c.fattura_ricevuta && c.fatt_tu_creata).length;
 
   // ─── LOGICA FUNZIONALE (Invariata) ──────────────────────────────────────────
   const loadConteggio = (p) => {
@@ -114,7 +114,7 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
     const idx = MESI.indexOf(form.mese);
     const nextMese = MESI[(idx + 1) % 12];
     const nextAnno = idx === 11 ? form.anno + 1 : form.anno;
-    onSave({ ...form, mese: nextMese, anno: nextAnno, distrib_inviata: false, pdf_addeb: false, fattura_ricevuta: false, fatt_tu_creata: false, unione_pdf: false, caricata_scadenziario: false, note_varie: "" });
+    onSave({ ...form, mese: nextMese, anno: nextAnno, distrib_inviata: false, pdf_addeb: false, fattura_ricevuta: false, fatt_tu_creata: false, note_varie: "" });
     alert(`Duplicato per ${nextMese} ${nextAnno}`);
   };
 
@@ -165,8 +165,6 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
                     ["PDF", "center", 50],
                     ["Fatt.", "center", 50],
                     ["TU", "center", 50],
-                    ["Unione", "center", 60],
-                    ["Scad.", "center", 55],
                   ].map(([h, align, w]) => (
                     <th key={h} style={{
                       padding: "9px 10px", textAlign: align, fontSize: 9, fontWeight: 700, color: "#94a3b8",
@@ -222,12 +220,12 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
                       {/* Stato */}
                       <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9" }}>
                         {c
-                          ? <Badge label={c.caricata_scadenziario ? "Completato" : "In corso"} color={c.caricata_scadenziario ? "success" : "warning"} />
+                          ? <Badge label={(c.distrib_inviata && c.pdf_addeb && c.fattura_ricevuta && c.fatt_tu_creata) ? "Completato" : "In corso"} color={(c.distrib_inviata && c.pdf_addeb && c.fattura_ricevuta && c.fatt_tu_creata) ? "success" : "warning"} />
                           : <Badge label="Mancante" color="neutral" />}
                       </td>
 
                       {/* Flag booleani */}
-                      {[c?.distrib_inviata, c?.pdf_addeb, c?.fattura_ricevuta, c?.fatt_tu_creata, c?.unione_pdf, c?.caricata_scadenziario].map((v, j) => (
+                      {[c?.distrib_inviata, c?.pdf_addeb, c?.fattura_ricevuta, c?.fatt_tu_creata].map((v, j) => (
                         <td key={j} style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
                           <Chk v={v} />
                         </td>

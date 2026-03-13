@@ -467,7 +467,7 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                             </td>
 
                             {/* PADRONCINO */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9" }}>
                               <div style={{ fontSize: 12, fontWeight: 600 }}>
                                 {isAz
                                   ? mz?.autista
@@ -501,7 +501,7 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                             </td>
 
                             {/* KWH INT */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                               <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 600, color: "#374151" }}>
                                 {r.int.toFixed(1)}
                               </div>
@@ -509,7 +509,7 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                             </td>
 
                             {/* KWH EXT */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                               <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 600, color: "#374151" }}>
                                 {r.ext.toFixed(1)}
                               </div>
@@ -517,28 +517,28 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                             </td>
 
                             {/* COSTO INT — blu */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                               <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700, color: "#2563eb" }}>
                                 {euro(r.cInt)} €
                               </span>
                             </td>
 
                             {/* COSTO EXT — amber */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                               {costoExt > 0
                                 ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700, color: "#d97706" }}>{euro(r.cExt)} €</span>
                                 : <span style={{ color: "#cbd5e1", fontSize: 11 }}>—</span>}
                             </td>
 
                             {/* TOTALE — verde */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                               <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#16a34a" }}>
                                 {euro(r.totale)} €
                               </span>
                             </td>
 
                             {/* MAGG — badge pill blu */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
                               {hasMagg
                                 ? <span style={{
                                     display: "inline-block", padding: "3px 10px", borderRadius: 999,
@@ -550,7 +550,7 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                             </td>
 
                             {/* ADDEBITO — viola */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                               {hasMagg
                                 ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#7c3aed" }}>
                                     {euro(addebito)} €

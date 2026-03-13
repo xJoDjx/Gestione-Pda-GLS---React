@@ -414,7 +414,8 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
 
   const filtered = mezzi.filter(m => {
     const s = search.toLowerCase();
-    const match = !s || [m.targa,m.marca,m.modello,m.tipo,m.alimentazione,m.autista,m.proprietario,m.stato,m.note_veicolo].some(v=>v?.toLowerCase().includes(s));
+    const padNome = padroncini.find(p=>p.id===m.padroncino_id)?.nome || "";
+    const match = !s || [...[m.targa,m.marca,m.modello,m.tipo,m.alimentazione,m.autista,m.proprietario,m.stato,m.note_veicolo], padNome].some(v=>v?.toLowerCase().includes(s));
     return match && (filtroStato==="TUTTI"||m.stato===filtroStato) && (!filtroCategoria||(m.categoria||"DISTRIBUZIONE")===filtroCategoria);
   });
 
@@ -453,7 +454,7 @@ export const MezziView = ({ mezzi=[], padroncini=[], onSave, onDelete, onAddNew 
       {/* Filtri */}
       <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
         <div style={{ flex:1,position:"relative",minWidth:200 }}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca targa, marca, modello..."
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca targa, marca, modello, padroncino..."
             style={{ width:"100%",padding:"9px 14px 9px 36px",borderRadius:10,border:"1px solid #e2e8f0",fontSize:13,background:"#fff",boxSizing:"border-box",outline:"none" }} />
           <div style={{ position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:"#94a3b8" }}><Icon name="search" size={16}/></div>
         </div>

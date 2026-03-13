@@ -374,8 +374,8 @@ export const DashboardView = ({ padroncini, conteggi, mezzi = [], onNavigate }) 
                     const add  = pc.reduce((s, c) => s + (c.totale_addebiti      || 0), 0);
                     const bon  = pc.reduce((s, c) => s + (c.totale_da_bonificare || 0), 0);
                     const doneAvg = Math.round(pc.reduce((s, c) => {
-                      const steps = [c.distrib_inviata, c.pdf_addeb, c.fattura_ricevuta, c.fatt_tu_creata, c.unione_pdf, c.caricata_scadenziario];
-                      return s + (steps.filter(Boolean).length / 6) * 100;
+                      const steps = [c.distrib_inviata, c.pdf_addeb, c.fattura_ricevuta, c.fatt_tu_creata];
+                      return s + (steps.filter(Boolean).length / 4) * 100;
                     }, 0) / pc.length);
                     return (
                       <tr key={p.id} style={{ background: i % 2 === 0 ? T.card : T.rowAlt, borderBottom: `1px solid ${T.border}` }}>

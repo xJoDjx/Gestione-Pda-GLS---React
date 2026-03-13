@@ -81,9 +81,43 @@ export const RicercaGlobale = ({ padroncini, conteggi, mezzi = [], palmari = [],
       });
       (c.ricariche_mezzi||[]).forEach(r => { if (r.targa?.toLowerCase().includes(q)) push(`Ricarica ${r.targa}`, r.importo, "Ricarica"); });
       (c.dettagli_mezzi||[]).forEach(m => { if (m.targa?.toLowerCase().includes(q)) push(`Targa ${m.targa}`, m.importo, "Mezzo Conteggio"); });
+      // Note conteggio
       if (c.note_varie?.toLowerCase().includes(q)) {
         found.push({ type:"nota", label:"Nota trovata", sub:`${pNome} · ${c.mese} ${c.anno} — "${c.note_varie.slice(0,60)}..."`, tag:"Note", tagColor:"#7c3aed", tagBg:"#ede9fe" });
       }
+      if (c.note_spedizioni?.toLowerCase().includes(q)) {
+        found.push({ type:"nota", label:"Nota spedizioni", sub:`${pNome} · ${c.mese} ${c.anno} — "${c.note_spedizioni.slice(0,60)}..."`, tag:"Note", tagColor:"#7c3aed", tagBg:"#ede9fe" });
+      }
+      if (c.note_proforma?.toLowerCase().includes(q)) {
+        found.push({ type:"nota", label:"Nota proforma", sub:`${pNome} · ${c.mese} ${c.anno} — "${c.note_proforma.slice(0,60)}..."`, tag:"Note", tagColor:"#7c3aed", tagBg:"#ede9fe" });
+      }
+      // Checklist / operazioni mese
+      (c.ops_mese||[]).forEach(op => {
+        if (op.testo?.toLowerCase().includes(q))
+          found.push({ type:"nota", label:`Checklist: ${op.testo.slice(0,50)}`, sub:`${pNome} · ${c.mese} ${c.anno}${op.done?" · ✓ Fatto":""}`, tag:"Checklist", tagColor:"#0369a1", tagBg:"#e0f2fe" });
+      });
+      // Note interne agli addebiti (campo .note separato dalla descrizione)
+      (c.altri_addebiti||[]).forEach(a => {
+        if (a.note?.toLowerCase().includes(q) && !a.descrizione?.toLowerCase().includes(q))
+          push(`${a.descrizione||"Addebito"} (nota: ${a.note.slice(0,40)})`, a.importo, "Nota Addebito");
+      });
+      // Note interne alle voci fatturato extra
+      (c.altri_fatturato||[]).forEach(a => {
+        if (a.note?.toLowerCase().includes(q) && !a.descrizione?.toLowerCase().includes(q))
+          push(`${a.descrizione||"Extra"} (nota: ${a.note.slice(0,40)})`, a.importo, "Nota Fatturato");
+      });
+      // Voci con descrizione/note
+      const vociCampi = [
+        ...(c.voci_fatturato||[]).map(v=>({...v, _prefix:"Voce PDA"})),
+        ...(c.voci_spedizioni||[]).map(v=>({...v, _prefix:"Spedizione"})),
+        ...(c.voci_consegne_doppie||[]).map(v=>({...v, _prefix:"Consegna Doppia"})),
+        ...(c.voci_palmari||[]).map(v=>({...v, _prefix:"Palmare"})),
+        ...(c.voci_compensazioni_distribuzione||[]).map(v=>({...v, _prefix:"Compensazione"})),
+      ];
+      vociCampi.forEach(v => {
+        const testo = `${v.descrizione||""} ${v.note||""} ${v.label||""}`.toLowerCase();
+        if (testo.includes(q)) push((v.descrizione||v.label||v._prefix), v.importo||v.val||0, v._prefix);
+      });
     });
 
     // ── Ricerca flotta mezzi globale ──────────────────────────
