@@ -1,6 +1,24 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// RicaricheView.jsx  —  refactored con theme.js
+//
+// Rimossi:
+//   ✅ Tutti i colori/spacing hardcoded → da theme (C, SP, TY, BR, SH)
+//
+// Tenuti locali (design specifico di questa vista):
+//   ⚙️  KpiCard  — ha icona ⚡ in cerchio, value a fontSize 28
+//   ⚙️  Card     — wrapper con header bar (usato solo qui)
+//   ⚙️  Field    — form field con label uppercase (usato solo qui)
+//   ⚙️  TextInput — input mono (usato solo qui)
+//
+// La logica CSV (parseRicaricheCSV, isJuice) è invariata.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useRef } from "react";
 import { euro, MESI } from "../utils/formatters";
 import { Icon } from "./Icons";
+
+import { C, SP, TY, BR, SH } from "./theme";
+
 
 // ─── CSV PARSER (invariato) ───────────────────────────────────────────────────
 const isJuice = (stazione) => {
@@ -11,7 +29,7 @@ const isJuice = (stazione) => {
 const parseRicaricheCSV = (text) => {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) return null;
-  const sep = lines[0].includes(";") ? ";" : ",";
+  const sep  = lines[0].includes(";") ? ";" : ",";
   const rows = lines.map(l => {
     const r = []; let cur = "", inQ = false;
     for (let ch of l) {
@@ -21,18 +39,18 @@ const parseRicaricheCSV = (text) => {
     }
     r.push(cur.trim()); return r;
   });
-  const header = rows[0].map(h => h.toLowerCase());
-  const findCol = (...terms) => { const i = header.findIndex(h => terms.some(t => h.includes(t))); return i >= 0 ? i : -1; };
-  const tc = findCol("targa","vehicle","plate") >= 0 ? findCol("targa","vehicle","plate") : 2;
-  const hc = findCol("stazione","serial number","nome della stazione") >= 0 ? findCol("stazione","serial number","nome della stazione") : 7;
-  const kc = findCol("energia","kwh","energy") >= 0 ? findCol("energia","kwh","energy") : 10;
+  const header   = rows[0].map(h => h.toLowerCase());
+  const findCol  = (...terms) => { const i = header.findIndex(h => terms.some(t => h.includes(t))); return i >= 0 ? i : -1; };
+  const tc = findCol("targa","vehicle","plate")                             >= 0 ? findCol("targa","vehicle","plate")                             : 2;
+  const hc = findCol("stazione","serial number","nome della stazione")     >= 0 ? findCol("stazione","serial number","nome della stazione")     : 7;
+  const kc = findCol("energia","kwh","energy")                             >= 0 ? findCol("energia","kwh","energy")                             : 10;
   const per_targa = {};
   for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
+    const row     = rows[i];
     if (!row || row.length <= Math.max(tc, hc, kc)) continue;
-    const targa = (row[tc] || "").trim().toUpperCase();
-    const stazione = (row[hc] || "").trim();
-    const kwh = parseFloat((row[kc] || "0").replace(",", ".")) || 0;
+    const targa   = (row[tc] || "").trim().toUpperCase();
+    const stazione= (row[hc] || "").trim();
+    const kwh     = parseFloat((row[kc] || "0").replace(",", ".")) || 0;
     if (!targa || targa === "-") continue;
     if (!per_targa[targa]) per_targa[targa] = { interne: 0, esterne: 0, sessioni_int: 0, sessioni_ext: 0 };
     if (isJuice(stazione)) { per_targa[targa].interne += kwh; per_targa[targa].sessioni_int++; }
@@ -45,74 +63,60 @@ const parseRicaricheCSV = (text) => {
   return per_targa;
 };
 
-// ─── MINI COMPONENTS ─────────────────────────────────────────────────────────
 
-// KPI card — white, subtle border, ⚡ icon top-right, large mono value
+// ─── MINI COMPONENTS (specifici di questa vista) ─────────────────────────────
+
+// KPI card con icona ⚡ e valore grande mono
 const KpiCard = ({ label, value, sub }) => (
-  <div style={{
-    background: "#ffffff", borderRadius: 12, border: "1px solid #e2e8f0",
-    padding: "20px 22px", display: "flex", flexDirection: "column", gap: 0,
-    boxShadow: "0 1px 2px rgba(15,23,42,0.04)"
-  }}>
+  <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: SH.card }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-        {label}
-      </span>
-      {/* ⚡ icon — small blue circle */}
-      <span style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: 28, height: 28, borderRadius: "50%", background: "#eff6ff",
-        fontSize: 13, flexShrink: 0
-      }}>⚡</span>
+      <span style={{ fontSize: TY.xs, fontWeight: TY.bold, color: C.fgSubtle, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</span>
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: C.primaryBg, fontSize: 13, flexShrink: 0 }}>⚡</span>
     </div>
-    <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: "#0f172a", lineHeight: 1, marginBottom: 8 }}>
-      {value}
-    </div>
-    {sub && <div style={{ fontSize: 11, color: "#94a3b8" }}>{sub}</div>}
+    <div style={{ fontSize: 28, fontWeight: TY.black, fontFamily: TY.mono, color: C.fg, lineHeight: 1, marginBottom: SP.gapSm }}>{value}</div>
+    {sub && <div style={{ fontSize: TY.sm, color: C.fgSubtle }}>{sub}</div>}
   </div>
 );
 
-// Card wrapper — white with header bar
+// Card wrapper con header bar
 const Card = ({ title, icon, children, noPad }) => (
-  <div style={{
-    background: "#ffffff", borderRadius: 12, border: "1px solid #e2e8f0",
-    boxShadow: "0 1px 2px rgba(15,23,42,0.04)", overflow: "hidden"
-  }}>
-    <div style={{
-      padding: "11px 16px", display: "flex", alignItems: "center", gap: 7,
-      borderBottom: "1px solid #f1f5f9", background: "#fafafa"
-    }}>
+  <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, boxShadow: SH.card, overflow: "hidden" }}>
+    <div style={{ padding: "11px 16px", display: "flex", alignItems: "center", gap: 7, borderBottom: `1px solid ${C.borderLight}`, background: C.bgRowAlt }}>
       <span style={{ fontSize: 14, opacity: 0.8 }}>{icon}</span>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        {title}
-      </span>
+      <span style={{ fontSize: TY.sm, fontWeight: TY.black, color: C.fg, textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</span>
     </div>
-    <div style={noPad ? {} : { padding: "16px 18px" }}>{children}</div>
+    <div style={noPad ? {} : { padding: SP.cardPad }}>{children}</div>
   </div>
 );
 
-// Form field with uppercase label
+// Form field con label uppercase
 const Field = ({ label, children }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    <label style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-      {label}
-    </label>
+  <div style={{ display: "flex", flexDirection: "column", gap: SP.gapXs }}>
+    <label style={TY.labelStyle}>{label}</label>
     {children}
   </div>
 );
 
-// Clean text input
+// Input monospaziato pulito
 const TextInput = ({ style, ...props }) => (
   <input style={{
-    padding: "9px 11px", borderRadius: 8, border: "1px solid #e2e8f0",
-    fontSize: 14, fontFamily: "'DM Mono', monospace", fontWeight: 600,
-    background: "#ffffff", outline: "none", color: "#0f172a",
-    width: "100%", boxSizing: "border-box",
-    ...style
+    padding:      "9px 11px",
+    borderRadius: BR.lg,
+    border:       `1px solid ${C.border}`,
+    fontSize:     14,
+    fontFamily:   TY.mono,
+    fontWeight:   TY.semi,
+    background:   C.white,
+    outline:      "none",
+    color:        C.fg,
+    width:        "100%",
+    boxSizing:    "border-box",
+    ...style,
   }} {...props} />
 );
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese, anno, onSaveMezzo }) => {
   const [selMese,   setSelMese]   = useState(mese);
   const [selAnno,   setSelAnno]   = useState(anno);
@@ -136,13 +140,12 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
   const meseKeys    = Object.keys(ricariche).sort().reverse().slice(0, 24);
   const costoTotale = (meseData.bolletta || 0) + totCostoExt;
 
-  // totAddebiti rispetta maggiorazione per-mezzo
   const totAddebiti = parseFloat(
     Object.entries(meseData.kwh_per_targa || {}).reduce((sum, [targa]) => {
       const d    = meseData.kwh_per_targa?.[targa] || {};
       const mz   = (mezzi || []).find(m => (m.targa || "").toUpperCase() === targa);
       const isAz = mz?.categoria === "AUTO AZIENDALE";
-      const pctMz = mz?.maggiorazione_ricarica_pct;
+      const pctMz= mz?.maggiorazione_ricarica_pct;
       const pct  = pctMz != null ? pctMz : (isAz ? 0 : maggiPct);
       const cInt = (d.interne || 0) * costoKwhInt;
       const cExt = (d.esterne || 0) * costoExt;
@@ -173,9 +176,8 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
         } else {
           const existing = { ...(meseData.kwh_per_targa || {}) };
           Object.entries(parsed).forEach(([t, v]) => {
-            // snapshot padroncino al momento dell'import (storico corretto)
-            const mzAtt         = (mezzi || []).find(m => (m.targa || "").toUpperCase() === t);
-            const padIdSnapshot = mzAtt?.padroncino_id || "";
+            const mzAtt          = (mezzi || []).find(m => (m.targa || "").toUpperCase() === t);
+            const padIdSnapshot  = mzAtt?.padroncino_id || "";
             existing[t] = { ...v, padroncino_id_snapshot: padIdSnapshot };
           });
           setMeseData({ kwh_per_targa: existing });
@@ -188,41 +190,37 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
     else { setImportMsg({ type: "warn", text: "File XLS: apri in Excel → Salva come → CSV → importa il CSV." }); setImporting(false); }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── RENDER ───────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-      {/* ══ HEADER ══ */}
+      {/* ── HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
+        <h1 style={{ margin: 0, fontSize: TY.xl, fontWeight: TY.black, color: C.fg, display: "flex", alignItems: "center", gap: SP.gapSm }}>
           ⚡ Ricariche Elettriche
         </h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <select value={selMese} onChange={e => setSelMese(e.target.value)} style={{
-            padding: "7px 12px", borderRadius: 8, border: "1px solid #e2e8f0",
-            fontSize: 13, fontWeight: 600, background: "#fff", cursor: "pointer",
-            outline: "none", color: "#0f172a", appearance: "auto"
-          }}>
-            {MESI.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <select value={selAnno} onChange={e => setSelAnno(parseInt(e.target.value) || new Date().getFullYear())} style={{
-            padding: "7px 12px", borderRadius: 8, border: "1px solid #e2e8f0",
-            fontSize: 13, fontWeight: 600, background: "#fff", cursor: "pointer",
-            outline: "none", color: "#0f172a", appearance: "auto"
-          }}>
-            {[2023, 2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+        <div style={{ display: "flex", gap: SP.gapSm }}>
+          {[
+            [selMese, MESI,                                          e => setSelMese(e.target.value)],
+            [selAnno, [2023,2024,2025,2026,2027],                    e => setSelAnno(parseInt(e.target.value) || new Date().getFullYear())],
+          ].map(([val, opts, onChange], idx) => (
+            <select key={idx} value={val} onChange={onChange} style={{
+              padding: "7px 12px", borderRadius: BR.lg, border: `1px solid ${C.border}`,
+              fontSize: TY.base_, fontWeight: TY.semi, background: C.white,
+              cursor: "pointer", outline: "none", color: C.fg, appearance: "auto",
+            }}>
+              {opts.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ))}
         </div>
       </div>
 
-      {/* ══ KPI ROW ══ */}
+      {/* ── KPI ROW ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
         <KpiCard
           label="Costo kWh Interno"
           value={costoKwhInt > 0 ? `${costoKwhInt.toFixed(4)} €` : "—"}
-          sub={costoKwhInt > 0
-            ? `${euro(meseData.bolletta || 0)} ÷ ${kwhBolletta.toFixed(1)} kWh`
-            : "Compila bolletta e kWh"}
+          sub={costoKwhInt > 0 ? `${euro(meseData.bolletta || 0)} ÷ ${kwhBolletta.toFixed(1)} kWh` : "Compila bolletta e kWh"}
         />
         <KpiCard
           label="kWh Totali"
@@ -241,7 +239,7 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
         />
       </div>
 
-      {/* ══ BODY ══ */}
+      {/* ── BODY ── */}
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 16, alignItems: "start" }}>
 
         {/* ── LEFT ── */}
@@ -263,16 +261,11 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                   onChange={e => setMeseData({ kwh_fatturati_bolletta: parseFloat(e.target.value) || 0 })} />
               </Field>
 
-              {/* Costo kWh calcolato — info pill */}
+              {/* Pill costo kWh calcolato */}
               {costoKwhInt > 0 && (
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "9px 12px", borderRadius: 8, background: "#eff6ff", border: "1px solid #bfdbfe"
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb" }}>Costo kWh Interno</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#2563eb" }}>
-                    {costoKwhInt.toFixed(4)} €/kWh
-                  </span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", borderRadius: BR.lg, background: C.primaryBg, border: `1px solid ${C.primaryBorder}` }}>
+                  <span style={{ fontSize: TY.md, fontWeight: TY.semi, color: C.primaryMid }}>Costo kWh Interno</span>
+                  <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.primaryMid }}>{costoKwhInt.toFixed(4)} €/kWh</span>
                 </div>
               )}
 
@@ -287,19 +280,22 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                     value={meseData.maggiorazione_pct ?? 20}
                     onChange={e => setMeseData({ maggiorazione_pct: parseFloat(e.target.value) || 0 })}
                     style={{ width: 80, textAlign: "center" }} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}>%</span>
+                  <span style={{ fontSize: 14, fontWeight: TY.semi, color: C.fgMuted }}>%</span>
                 </div>
               </Field>
 
               <Field label="Note">
-                <textarea value={meseData.note || ""} onChange={e => setMeseData({ note: e.target.value })}
+                <textarea
+                  value={meseData.note || ""}
+                  onChange={e => setMeseData({ note: e.target.value })}
                   placeholder="Note, n° fattura..."
                   style={{
-                    padding: "9px 11px", borderRadius: 8, border: "1px solid #e2e8f0",
-                    fontSize: 13, resize: "vertical", minHeight: 72,
+                    padding: "9px 11px", borderRadius: BR.lg, border: `1px solid ${C.border}`,
+                    fontSize: TY.base_, resize: "vertical", minHeight: 72,
                     fontFamily: "inherit", outline: "none",
-                    width: "100%", boxSizing: "border-box", color: "#374151"
-                  }} />
+                    width: "100%", boxSizing: "border-box", color: C.fg,
+                  }}
+                />
               </Field>
 
               {/* Mesi registrati */}
@@ -308,25 +304,26 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                   <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" }}>
                     {meseKeys.map(k => {
                       const [m, a] = k.split("_");
-                      const d = ricariche[k];
+                      const d        = ricariche[k];
                       const isActive = k === key;
                       return (
                         <div key={k}
                           onClick={() => { setSelMese(m); setSelAnno(parseInt(a)); }}
                           style={{
-                            padding: "7px 11px", borderRadius: 8, cursor: "pointer",
-                            border: `1px solid ${isActive ? "#bfdbfe" : "#e2e8f0"}`,
-                            background: isActive ? "#eff6ff" : "#fafafa",
-                            display: "flex", justifyContent: "space-between", alignItems: "center"
+                            padding: "7px 11px", borderRadius: BR.lg, cursor: "pointer",
+                            border:     `1px solid ${isActive ? C.primaryBorder : C.border}`,
+                            background:  isActive ? C.primaryBg : C.bgRowAlt,
+                            display:    "flex", justifyContent: "space-between", alignItems: "center",
                           }}
                           onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "#f0f9ff"; }}
-                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "#fafafa"; }}>
-                          <span style={{ fontSize: 12, fontWeight: isActive ? 700 : 500, color: isActive ? "#1d4ed8" : "#374151" }}>
+                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = C.bgRowAlt; }}
+                        >
+                          <span style={{ fontSize: TY.md, fontWeight: isActive ? TY.bold : TY.semi, color: isActive ? C.primarySoft : C.fg }}>
                             {m} {a}
                           </span>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 12, fontFamily: "'DM Mono',monospace", fontWeight: 700, color: "#1d4ed8" }}>{euro(d.bolletta || 0)}</div>
-                            <div style={{ fontSize: 10, color: "#94a3b8" }}>{Object.keys(d.kwh_per_targa || {}).length} targhe</div>
+                            <div style={{ fontSize: TY.md, fontFamily: TY.mono, fontWeight: TY.bold, color: C.primarySoft }}>{euro(d.bolletta || 0)}</div>
+                            <div style={{ fontSize: TY.xs, color: C.fgSubtle }}>{Object.keys(d.kwh_per_targa || {}).length} targhe</div>
                           </div>
                         </div>
                       );
@@ -339,26 +336,25 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
 
           {/* Import CSV */}
           <Card title="Import CSV" icon="📤">
-            <p style={{ fontSize: 12, color: "#64748b", lineHeight: 1.65, margin: "0 0 14px" }}>
+            <p style={{ fontSize: TY.md, color: C.fgMuted, lineHeight: 1.65, margin: "0 0 14px" }}>
               Carica il report CSV. <strong>Juice Box/Pole</strong> → interne, altre → esterne.
             </p>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: SP.gapSm, flexWrap: "wrap" }}>
               <button onClick={() => fileRef.current?.click()} disabled={importing} style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", borderRadius: 8,
-                background: "#fff", border: "1px solid #86efac",
-                color: "#166534", fontSize: 12, fontWeight: 700,
-                cursor: importing ? "not-allowed" : "pointer",
-                opacity: importing ? 0.55 : 1
+                display: "flex", alignItems: "center", gap: SP.gapXs,
+                padding: "8px 16px", borderRadius: BR.lg,
+                background: C.white, border: `1px solid ${C.successDot}`,
+                color: C.success, fontSize: TY.md, fontWeight: TY.bold,
+                cursor: importing ? "not-allowed" : "pointer", opacity: importing ? 0.55 : 1,
               }}>
                 <Icon name="upload" size={13} /> {importing ? "Importando..." : "Carica CSV"}
               </button>
               {numTarghe > 0 && (
                 <button onClick={() => { if (window.confirm("Cancellare tutti i dati kWh di questo mese?")) setMeseData({ kwh_per_targa: {} }); }} style={{
                   display: "flex", alignItems: "center", gap: 5,
-                  padding: "8px 14px", borderRadius: 8,
-                  background: "#fff", border: "1px solid #fca5a5",
-                  color: "#dc2626", fontSize: 12, fontWeight: 700, cursor: "pointer"
+                  padding: "8px 14px", borderRadius: BR.lg,
+                  background: C.white, border: `1px solid ${C.dangerDot}`,
+                  color: C.danger, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer",
                 }}>
                   <Icon name="trash" size={12} /> Reset
                 </button>
@@ -368,11 +364,11 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
               onChange={e => { handleFile(e.target.files[0]); e.target.value = ""; }} />
             {importMsg && (
               <div style={{
-                marginTop: 12, padding: "9px 13px", borderRadius: 8,
-                fontSize: 12, fontWeight: 600,
-                background: importMsg.type === "success" ? "#dcfce7" : importMsg.type === "warn" ? "#fffbeb" : "#fee2e2",
-                color:      importMsg.type === "success" ? "#166534" : importMsg.type === "warn" ? "#92400e" : "#dc2626",
-                border: `1px solid ${importMsg.type === "success" ? "#86efac" : importMsg.type === "warn" ? "#fde68a" : "#fca5a5"}`
+                marginTop: 12, padding: "9px 13px", borderRadius: BR.lg,
+                fontSize:   TY.md, fontWeight: TY.semi,
+                background: importMsg.type === "success" ? C.successBgAlt : importMsg.type === "warn" ? C.warningBgAlt : C.dangerBgAlt,
+                color:      importMsg.type === "success" ? C.success       : importMsg.type === "warn" ? C.warning      : C.danger,
+                border:     `1px solid ${importMsg.type === "success" ? C.successDot : importMsg.type === "warn" ? C.warningBorder : C.dangerDot}`,
               }}>
                 {importMsg.type === "success" ? "✅" : importMsg.type === "warn" ? "⚠️" : "❌"} {importMsg.text}
               </div>
@@ -383,55 +379,46 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
         {/* ── RIGHT: tabella targhe ── */}
         <div>
           {numTarghe === 0 ? (
-            <div style={{
-              background: "#fff", borderRadius: 12, border: "2px dashed #e2e8f0",
-              padding: "60px 32px", textAlign: "center"
-            }}>
+            <div style={{ background: C.white, borderRadius: BR.card, border: `2px dashed ${C.border}`, padding: "60px 32px", textAlign: "center" }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>⚡</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
+              <div style={{ fontSize: 15, fontWeight: TY.bold, color: C.fg, marginBottom: SP.gapXs }}>
                 Nessun dato kWh per {selMese} {selAnno}
               </div>
-              <div style={{ fontSize: 12, color: "#94a3b8" }}>
+              <div style={{ fontSize: TY.md, color: C.fgSubtle }}>
                 Importa un file CSV per visualizzare le ricariche per targa
               </div>
             </div>
           ) : (
-            <div style={{
-              background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0",
-              overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,0.04)"
-            }}>
+            <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: SH.card }}>
               {/* Card header */}
-              <div style={{
-                padding: "11px 18px", borderBottom: "1px solid #f1f5f9",
-                background: "#fafafa", display: "flex", alignItems: "center", gap: 7
-              }}>
+              <div style={{ padding: "11px 18px", borderBottom: `1px solid ${C.borderLight}`, background: C.bgRowAlt, display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ fontSize: 14, opacity: 0.8 }}>⚡</span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                <span style={{ fontSize: TY.sm, fontWeight: TY.black, color: C.fg, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   Dettaglio per Targa — {numTarghe} veicoli
                 </span>
               </div>
 
-              {/* Table */}
+              {/* Tabella */}
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
                   <thead>
-                    <tr style={{ background: "#f8fafc" }}>
+                    <tr style={{ background: C.bgPage }}>
                       {[
-                        { label: "Targa",      w: 110, align: "left"  },
-                        { label: "Padroncino", w: 160, align: "left"  },
-                        { label: "kWh Int.",   w: 90,  align: "right" },
-                        { label: "kWh Ext.",   w: 90,  align: "right" },
-                        { label: "Costo Int.", w: 110, align: "right" },
-                        { label: "Costo Ext.", w: 110, align: "right" },
-                        { label: "Totale",     w: 110, align: "right" },
-                        { label: "Magg.",      w: 80,  align: "center"},
-                        { label: "Addebito",   w: 110, align: "right" },
+                        { label: "Targa",      w: 110, align: "left"   },
+                        { label: "Padroncino", w: 160, align: "left"   },
+                        { label: "kWh Int.",   w: 90,  align: "right"  },
+                        { label: "kWh Ext.",   w: 90,  align: "right"  },
+                        { label: "Costo Int.", w: 110, align: "right"  },
+                        { label: "Costo Ext.", w: 110, align: "right"  },
+                        { label: "Totale",     w: 110, align: "right"  },
+                        { label: "Magg.",      w: 80,  align: "center" },
+                        { label: "Addebito",   w: 110, align: "right"  },
                       ].map(col => (
                         <th key={col.label} style={{
-                          padding: "11px 14px", fontSize: 10, fontWeight: 700,
-                          color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em",
-                          borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap",
-                          textAlign: col.align, width: col.w
+                          padding: "11px 14px", fontSize: TY.xs, fontWeight: TY.bold,
+                          color: C.fgSubtle, textTransform: "uppercase", letterSpacing: "0.07em",
+                          borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap",
+                          textAlign: col.align, width: col.w,
                         }}>{col.label}</th>
                       ))}
                     </tr>
@@ -440,42 +427,40 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                     {Object.entries(meseData.kwh_per_targa || {})
                       .sort((a, b) => a[0].localeCompare(b[0]))
                       .map(([targa, vals], ri) => {
-                        const r            = getRiga(targa);
-                        const mz           = (mezzi || []).find(m => (m.targa || "").toUpperCase() === targa);
-                        const padIdStorico = vals.padroncino_id_snapshot || mz?.padroncino_id || "";
-                        const pad          = (padroncini || []).find(p => p.id === padIdStorico) || null;
-                        const isAz         = mz?.categoria === "AUTO AZIENDALE";
-                        const pctMz        = mz?.maggiorazione_ricarica_pct;
-                        const pctEff       = pctMz != null ? pctMz : (isAz ? 0 : maggiPct);
-                        const addebito     = parseFloat((r.totale * (1 + pctEff / 100)).toFixed(2));
-                        const hasMagg      = pctEff > 0;
-                        const rowBg        = ri % 2 === 0 ? "#ffffff" : "#fafafa";
+                        const r             = getRiga(targa);
+                        const mz            = (mezzi || []).find(m => (m.targa || "").toUpperCase() === targa);
+                        const padIdStorico  = vals.padroncino_id_snapshot || mz?.padroncino_id || "";
+                        const pad           = (padroncini || []).find(p => p.id === padIdStorico) || null;
+                        const isAz          = mz?.categoria === "AUTO AZIENDALE";
+                        const pctMz         = mz?.maggiorazione_ricarica_pct;
+                        const pctEff        = pctMz != null ? pctMz : (isAz ? 0 : maggiPct);
+                        const addebito      = parseFloat((r.totale * (1 + pctEff / 100)).toFixed(2));
+                        const hasMagg       = pctEff > 0;
+                        const rowBg         = ri % 2 === 0 ? C.white : C.bgRowAlt;
 
                         return (
                           <tr key={targa} style={{ background: rowBg }}
-                            onMouseEnter={e => e.currentTarget.style.background = "#f0f9ff"}
+                            onMouseEnter={e => e.currentTarget.style.background = C.primaryBg}
                             onMouseLeave={e => e.currentTarget.style.background = rowBg}>
 
                             {/* TARGA */}
-                            <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9" }}>
-                              <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800, fontSize: 13, color: "#0f172a" }}>
-                                {targa}
-                              </span>
+                            <td style={{ padding: "12px 14px", borderBottom: `1px solid ${C.borderLight}` }}>
+                              <span style={{ fontFamily: TY.mono, fontWeight: TY.black, fontSize: TY.base_, color: C.fg }}>{targa}</span>
                               {mz && (mz.alimentazione || "").toLowerCase().includes("elettr") && (
-                                <div style={{ fontSize: 9, color: "#10b981", fontWeight: 700, marginTop: 1 }}>⚡ flotta</div>
+                                <div style={{ fontSize: TY.xxs, color: "#10b981", fontWeight: TY.bold, marginTop: 1 }}>⚡ flotta</div>
                               )}
                             </td>
 
                             {/* PADRONCINO */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9" }}>
-                              <div style={{ fontSize: 12, fontWeight: 600 }}>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}` }}>
+                              <div style={{ fontSize: TY.md, fontWeight: TY.semi }}>
                                 {isAz
                                   ? mz?.autista
-                                    ? <span style={{ color: "#7c3aed" }}>🚗 {mz.autista}</span>
-                                    : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>Aziendale</span>
+                                    ? <span style={{ color: C.violetSoft }}>🚗 {mz.autista}</span>
+                                    : <span style={{ color: C.fgSubtle, fontStyle: "italic" }}>Aziendale</span>
                                   : pad
-                                    ? <span style={{ color: "#2563eb" }}>{pad.nome}</span>
-                                    : <span style={{ color: "#94a3b8", fontStyle: "italic" }}>—</span>
+                                    ? <span style={{ color: C.primaryMid }}>{pad.nome}</span>
+                                    : <span style={{ color: C.fgSubtle, fontStyle: "italic" }}>—</span>
                                 }
                               </div>
                               {/* Input maggiorazione per-mezzo */}
@@ -489,103 +474,74 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                                       onSaveMezzo({ ...mz, maggiorazione_ricarica_pct: val });
                                     }}
                                     style={{
-                                      width: 42, padding: "3px 6px", borderRadius: 6,
-                                      border: "1px solid #c4b5fd", fontSize: 11,
-                                      fontFamily: "'DM Mono',monospace", fontWeight: 700,
-                                      color: "#6d28d9", textAlign: "center",
-                                      background: "#faf5ff", outline: "none"
-                                    }} />
-                                  <span style={{ fontSize: 10, color: "#6d28d9", fontWeight: 600 }}>% custom</span>
+                                      width: 42, padding: "3px 6px", borderRadius: BR.sm,
+                                      border: `1px solid ${C.violetBorder}`, fontSize: TY.sm,
+                                      fontFamily: TY.mono, fontWeight: TY.bold,
+                                      color: C.violet, textAlign: "center",
+                                      background: C.violetBgAlt, outline: "none",
+                                    }}
+                                  />
+                                  <span style={{ fontSize: TY.xs, color: C.violet, fontWeight: TY.semi }}>% custom</span>
                                 </div>
                               )}
                             </td>
 
                             {/* KWH INT */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 600, color: "#374151" }}>
-                                {r.int.toFixed(1)}
-                              </div>
-                              <div style={{ fontSize: 9, color: "#94a3b8" }}>{vals.sessioni_int || 0} sess.</div>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
+                              <div style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.semi, color: C.fg }}>{r.int.toFixed(1)}</div>
+                              <div style={{ fontSize: TY.xxs, color: C.fgSubtle }}>{vals.sessioni_int || 0} sess.</div>
                             </td>
 
                             {/* KWH EXT */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 600, color: "#374151" }}>
-                                {r.ext.toFixed(1)}
-                              </div>
-                              <div style={{ fontSize: 9, color: "#94a3b8" }}>{vals.sessioni_ext || 0} sess.</div>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
+                              <div style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.semi, color: C.fg }}>{r.ext.toFixed(1)}</div>
+                              <div style={{ fontSize: TY.xxs, color: C.fgSubtle }}>{vals.sessioni_ext || 0} sess.</div>
                             </td>
 
                             {/* COSTO INT — blu */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700, color: "#2563eb" }}>
-                                {euro(r.cInt)} €
-                              </span>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
+                              <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.bold, color: C.primaryMid }}>{euro(r.cInt)} €</span>
                             </td>
 
                             {/* COSTO EXT — amber */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                               {costoExt > 0
-                                ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 700, color: "#d97706" }}>{euro(r.cExt)} €</span>
-                                : <span style={{ color: "#cbd5e1", fontSize: 11 }}>—</span>}
+                                ? <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.bold, color: C.warningMid }}>{euro(r.cExt)} €</span>
+                                : <span style={{ color: "#cbd5e1", fontSize: TY.sm }}>—</span>}
                             </td>
 
                             {/* TOTALE — verde */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#16a34a" }}>
-                                {euro(r.totale)} €
-                              </span>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
+                              <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.successMid }}>{euro(r.totale)} €</span>
                             </td>
 
                             {/* MAGG — badge pill blu */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "center" }}>
                               {hasMagg
-                                ? <span style={{
-                                    display: "inline-block", padding: "3px 10px", borderRadius: 999,
-                                    background: "#dbeafe", color: "#1d4ed8",
-                                    fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono',monospace",
-                                    whiteSpace: "nowrap"
-                                  }}>+{pctEff}%</span>
-                                : <span style={{ color: "#cbd5e1", fontSize: 11 }}>—</span>}
+                                ? <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, background: C.primaryBgAlt, color: C.primarySoft, fontSize: TY.sm, fontWeight: TY.bold, fontFamily: TY.mono, whiteSpace: "nowrap" }}>+{pctEff}%</span>
+                                : <span style={{ color: "#cbd5e1", fontSize: TY.sm }}>—</span>}
                             </td>
 
                             {/* ADDEBITO — viola */}
-                            <td style={{ padding: "5px 14px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                               {hasMagg
-                                ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#7c3aed" }}>
-                                    {euro(addebito)} €
-                                  </span>
-                                : <span style={{ color: "#cbd5e1", fontSize: 11 }}>—</span>}
+                                ? <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.violetSoft }}>{euro(addebito)} €</span>
+                                : <span style={{ color: "#cbd5e1", fontSize: TY.sm }}>—</span>}
                             </td>
                           </tr>
                         );
                       })}
 
                     {/* ── RIGA TOTALI ── */}
-                    <tr style={{ background: "#f8fafc" }}>
-                      <td colSpan={2} style={{
-                        padding: "13px 14px", fontSize: 11, fontWeight: 800,
-                        color: "#0f172a", borderTop: "2px solid #e2e8f0", letterSpacing: "0.04em"
-                      }}>TOTALE</td>
-                      <td style={{ padding: "13px 14px", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 700, textAlign: "right", color: "#374151", borderTop: "2px solid #e2e8f0" }}>
-                        {totKwhInt.toFixed(1)}
-                      </td>
-                      <td style={{ padding: "13px 14px", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 700, textAlign: "right", color: "#374151", borderTop: "2px solid #e2e8f0" }}>
-                        {totKwhExt.toFixed(1)}
-                      </td>
-                      <td style={{ padding: "13px 14px", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 800, color: "#2563eb", textAlign: "right", borderTop: "2px solid #e2e8f0" }}>
-                        {euro(meseData.bolletta || 0)} €
-                      </td>
-                      <td style={{ padding: "13px 14px", fontFamily: "'DM Mono',monospace", fontSize: 12, fontWeight: 800, color: "#d97706", textAlign: "right", borderTop: "2px solid #e2e8f0" }}>
-                        {euro(totCostoExt)} €
-                      </td>
-                      <td style={{ padding: "13px 14px", fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#16a34a", textAlign: "right", borderTop: "2px solid #e2e8f0" }}>
-                        {euro(costoTotale)} €
-                      </td>
-                      <td style={{ padding: "13px 14px", borderTop: "2px solid #e2e8f0" }} />
-                      <td style={{ padding: "13px 14px", fontFamily: "'DM Mono',monospace", fontSize: 13, fontWeight: 800, color: "#7c3aed", textAlign: "right", borderTop: "2px solid #e2e8f0" }}>
-                        {euro(totAddebiti)} €
-                      </td>
+                    <tr style={{ background: C.bgPage }}>
+                      <td colSpan={2} style={{ padding: "13px 14px", fontSize: TY.sm, fontWeight: TY.black, color: C.fg, borderTop: `2px solid ${C.border}`, letterSpacing: "0.04em" }}>TOTALE</td>
+                      <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.md, fontWeight: TY.bold, textAlign: "right", color: C.fg,         borderTop: `2px solid ${C.border}` }}>{totKwhInt.toFixed(1)}</td>
+                      <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.md, fontWeight: TY.bold, textAlign: "right", color: C.fg,         borderTop: `2px solid ${C.border}` }}>{totKwhExt.toFixed(1)}</td>
+                      <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.md, fontWeight: TY.black, color: C.primaryMid, textAlign: "right", borderTop: `2px solid ${C.border}` }}>{euro(meseData.bolletta || 0)} €</td>
+                      <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.md, fontWeight: TY.black, color: C.warningMid, textAlign: "right", borderTop: `2px solid ${C.border}` }}>{euro(totCostoExt)} €</td>
+                      <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.successMid, textAlign: "right", borderTop: `2px solid ${C.border}` }}>{euro(costoTotale)} €</td>
+                      <td style={{ padding: "13px 14px", borderTop: `2px solid ${C.border}` }} />
+                      <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.violetSoft, textAlign: "right", borderTop: `2px solid ${C.border}` }}>{euro(totAddebiti)} €</td>
                     </tr>
                   </tbody>
                 </table>

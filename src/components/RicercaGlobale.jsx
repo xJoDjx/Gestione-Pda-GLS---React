@@ -79,8 +79,16 @@ export const RicercaGlobale = ({ padroncini, conteggi, mezzi = [], palmari = [],
         const desc = a.cod ? `COD ${a.cod}` : (a.descrizione||"");
         if (desc.toLowerCase().includes(q)) push(desc, a.importo, "Cassa Prima Nota");
       });
-      (c.ricariche_mezzi||[]).forEach(r => { if (r.targa?.toLowerCase().includes(q)) push(`Ricarica ${r.targa}`, r.importo, "Ricarica"); });
-      (c.dettagli_mezzi||[]).forEach(m => { if (m.targa?.toLowerCase().includes(q)) push(`Targa ${m.targa}`, m.importo, "Mezzo Conteggio"); });
+      (c.ricariche_mezzi||[]).forEach(r => {
+        if ([r.targa, r.descrizione].some(f => f?.toLowerCase().includes(q)))
+          push(`Ricarica ${r.targa}`, r.importo, "Ricarica");
+      });
+      // note mezzi
+      (c.dettagli_mezzi||[]).forEach(m => {
+        if (m.nota?.toLowerCase().includes(q) && !m.targa?.toLowerCase().includes(q))
+          push(`${m.targa||"Extra"} (nota: ${m.nota.slice(0,40)})`, m.importo, "Nota Noleggio Mezzi");
+      });
+
       // Note conteggio
       if (c.note_varie?.toLowerCase().includes(q)) {
         found.push({ type:"nota", label:"Nota trovata", sub:`${pNome} · ${c.mese} ${c.anno} — "${c.note_varie.slice(0,60)}..."`, tag:"Note", tagColor:"#7c3aed", tagBg:"#ede9fe" });
@@ -109,6 +117,8 @@ export const RicercaGlobale = ({ padroncini, conteggi, mezzi = [], palmari = [],
       // Voci con descrizione/note
       const vociCampi = [
         ...(c.voci_fatturato||[]).map(v=>({...v, _prefix:"Voce PDA"})),
+        ...(c.altri_fatturato||[]).map(v=>({...v, _prefix:"Extra Fatturato", descrizione:v.descrizione, note:v.note})),
+        ...(c.altri_addebiti||[]).map(v=>({...v, _prefix:"Addebito"})),
         ...(c.voci_spedizioni||[]).map(v=>({...v, _prefix:"Spedizione"})),
         ...(c.voci_consegne_doppie||[]).map(v=>({...v, _prefix:"Consegna Doppia"})),
         ...(c.voci_palmari||[]).map(v=>({...v, _prefix:"Palmare"})),

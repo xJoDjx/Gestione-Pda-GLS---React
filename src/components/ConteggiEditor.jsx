@@ -1,67 +1,92 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ConteggiEditor.jsx  —  refactored con theme.js
+//
+// Rimossi:
+//   ✅ Tutti i colori/spacing hardcoded → da theme (C, SP, TY, BR, SH)
+//
+// Tenuti locali (design genuinamente diverso):
+//   ⚙️  KpiCard — ha prop `color` per tintare l'icona, ha `flex:1` per fill row
+//   ⚙️  Badge   — ha una propria mappa semantica (success/warning/neutral)
+//   ⚙️  Chk     — checkmark inline per le colonne boolean
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useRef } from "react";
 import { ConteggiForm } from "./ConteggiForm";
 import { euro, giorniMese, PALMARE_TARIFFA_GG, calcTotali, createConteggio, MESI } from "../utils/formatters";
 import { Icon } from "./Icons";
 
-// ─── KPI CARD ─────────────────────────────────────────────────────────────────
-const KpiCard = ({ label, value, sub, icon, color = "#3b82f6" }) => (
+import { C, SP, TY, BR, SH } from "./theme";
+
+
+// ─── KPI CARD (Conteggi) ─────────────────────────────────────────────────────
+// Versione con flex:1 per riempire la riga, e `color` per tintare l'icona
+const KpiCard = ({ label, value, sub, icon, color = C.primaryMid }) => (
   <div style={{
-    background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    padding: "14px 18px",
-    flex: 1,
-    minWidth: 0,
-    boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+    background:   C.white,
+    borderRadius: BR.card,
+    border:       `1px solid ${C.border}`,
+    padding:      "14px 18px",
+    flex:         1,
+    minWidth:     0,
+    boxShadow:    SH.card,
   }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+      <div style={{ ...TY.labelStyle }}>{label}</div>
       <div style={{ color, opacity: 0.7, lineHeight: 1 }}>{icon}</div>
     </div>
-    <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", fontFamily: "'DM Mono', monospace", letterSpacing: "-0.02em" }}>{value}</div>
-    <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 3, fontWeight: 500 }}>{sub}</div>
+    <div style={{ fontSize: 20, fontWeight: TY.black, color: C.fg, fontFamily: TY.mono, letterSpacing: "-0.02em" }}>{value}</div>
+    <div style={{ fontSize: TY.xs, color: C.fgSubtle, marginTop: 3, fontWeight: TY.semi }}>{sub}</div>
   </div>
 );
 
-// ─── BADGE ────────────────────────────────────────────────────────────────────
+// ─── BADGE ───────────────────────────────────────────────────────────────────
+const BADGE_MAP = {
+  success: { bg: C.successBgAlt, text: C.success,  border: C.successBorder },
+  warning: { bg: C.noteBg,       text: C.noteColor, border: C.noteBorder   },
+  neutral: { bg: C.bgPage,       text: C.fgMuted,   border: C.border       },
+};
 const Badge = ({ label, color }) => {
-  const map = {
-    success: { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" },
-    warning: { bg: "#fef9c3", text: "#854d0e", border: "#fde68a" },
-    neutral:  { bg: "#f1f5f9", text: "#64748b", border: "#e2e8f0" },
-  };
-  const c = map[color] || map.neutral;
+  const s = BADGE_MAP[color] || BADGE_MAP.neutral;
   return (
     <span style={{
-      display: "inline-block", padding: "2px 9px", borderRadius: 5, fontSize: 10, fontWeight: 700,
-      background: c.bg, color: c.text, border: `1px solid ${c.border}`, whiteSpace: "nowrap"
+      display:      "inline-block",
+      padding:      "2px 9px",
+      borderRadius: BR.sm,
+      fontSize:     TY.xs,
+      fontWeight:   TY.bold,
+      background:   s.bg,
+      color:        s.text,
+      border:       `1px solid ${s.border}`,
+      whiteSpace:   "nowrap",
     }}>{label}</span>
   );
 };
 
 // ─── CHECK ICON ───────────────────────────────────────────────────────────────
 const Chk = ({ v }) => v
-  ? <span style={{ color:"#10b981",fontSize:14,lineHeight:1 }}>✓</span>
-  : <span style={{ color:"#e2e8f0",fontSize:14,lineHeight:1 }}>–</span>;
+  ? <span style={{ color: "#10b981", fontSize: 14, lineHeight: 1 }}>✓</span>
+  : <span style={{ color: C.border, fontSize: 14, lineHeight: 1 }}>–</span>;
 
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDelete, addebiti_standard = [], ricariche = {}, mezziFlotta = [] }) => {
-  const [selPad, setSelPad] = useState(null);
-  const [form, setForm] = useState(null);
-  const [tab, setTab] = useState("riepilogo");
-  const [saveIndicator, setSaveIndicator] = useState(null);
-  const giorni = giorniMese(mese, anno);
+  const [selPad,         setSelPad]         = useState(null);
+  const [form,           setForm]           = useState(null);
+  const [tab,            setTab]            = useState("riepilogo");
+  const [saveIndicator,  setSaveIndicator]  = useState(null);
+  const giorni        = giorniMese(mese, anno);
   const autoSaveTimer = useRef(null);
-  const prevForm = useRef(null);
+  const prevForm      = useRef(null);
 
-  const pAttivi = padroncini.filter(p => p.stato === "ATTIVO");
+  const pAttivi      = padroncini.filter(p => p.stato === "ATTIVO");
   const meseConteggi = conteggi.filter(c => c.mese === mese && c.anno === anno);
 
-  const totFatt = meseConteggi.reduce((s, c) => s + (c.totale_fattura || 0), 0);
-  const totAdd  = meseConteggi.reduce((s, c) => s + (c.totale_addebiti || 0), 0);
-  const totBon  = meseConteggi.reduce((s, c) => s + (c.totale_da_bonificare || 0), 0);
+  const totFatt    = meseConteggi.reduce((s, c) => s + (c.totale_fattura || 0), 0);
+  const totAdd     = meseConteggi.reduce((s, c) => s + (c.totale_addebiti || 0), 0);
+  const totBon     = meseConteggi.reduce((s, c) => s + (c.totale_da_bonificare || 0), 0);
   const completati = meseConteggi.filter(c => c.distrib_inviata && c.pdf_addeb && c.fattura_ricevuta && c.fatt_tu_creata).length;
 
-  // ─── LOGICA FUNZIONALE (Invariata) ──────────────────────────────────────────
+  // ─── LOGICA FUNZIONALE (invariata) ──────────────────────────────────────────
   const loadConteggio = (p) => {
     setSelPad(p);
     setTab("riepilogo");
@@ -111,7 +136,7 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
 
   const handleDuplica = () => {
     if (!form) return;
-    const idx = MESI.indexOf(form.mese);
+    const idx      = MESI.indexOf(form.mese);
     const nextMese = MESI[(idx + 1) % 12];
     const nextAnno = idx === 11 ? form.anno + 1 : form.anno;
     onSave({ ...form, mese: nextMese, anno: nextAnno, distrib_inviata: false, pdf_addeb: false, fattura_ricevuta: false, fatt_tu_creata: false, note_varie: "" });
@@ -126,99 +151,101 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
 
   const hasSaved = form && conteggi.some(c => c.padroncino_id === form.padroncino_id && c.mese === form.mese && c.anno === form.anno);
 
-  // ─── VISTA LISTA PADRONCINI ──────────────────────────────────────────────────
+  // ─── VISTA LISTA ─────────────────────────────────────────────────────────────
   if (!selPad) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: SP.gap }}>
 
         {/* KPI Grid */}
         <div style={{ display: "flex", gap: 10 }}>
           <KpiCard label="Fatturato Mese" value={euro(totFatt)} icon={<Icon name="calculator" size={15}/>} sub={`${meseConteggi.length} conteggi`} />
-          <KpiCard label="Addebiti" value={euro(totAdd)} icon={<Icon name="file" size={15}/>} sub="totale addebiti" color="#ef4444" />
-          <KpiCard label="Da Bonificare" value={euro(totBon)} icon={<Icon name="save" size={15}/>} sub="residuo netto" color="#10b981" />
-          <KpiCard label="Completati" value={`${completati}/${meseConteggi.length}`} icon={<Icon name="check" size={15}/>}
-            sub={completati === meseConteggi.length && meseConteggi.length > 0 ? "Tutti pronti ✓" : "In lavorazione"} color="#8b5cf6" />
+          <KpiCard label="Addebiti"       value={euro(totAdd)}  icon={<Icon name="file" size={15}/>}       sub="totale addebiti"  color={C.danger} />
+          <KpiCard label="Da Bonificare"  value={euro(totBon)}  icon={<Icon name="save" size={15}/>}       sub="residuo netto"    color="#10b981" />
+          <KpiCard label="Completati"     value={`${completati}/${meseConteggi.length}`} icon={<Icon name="check" size={15}/>}
+            sub={completati === meseConteggi.length && meseConteggi.length > 0 ? "Tutti pronti ✓" : "In lavorazione"} color={C.violetSoft} />
         </div>
 
-        {/* Tabella Principale */}
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+        {/* Tabella principale */}
+        <div style={{ background: C.white, borderRadius: BR.table, border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: SH.card }}>
+
           {/* Header tabella */}
-          <div style={{ padding: "12px 18px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: "#3b82f6" }}><Icon name="calculator" size={15}/></span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Conteggi — {mese} {anno}</span>
+          <div style={{ padding: "12px 18px", borderBottom: `1px solid ${C.border}`, background: C.bgPage, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: SP.gapSm }}>
+              <span style={{ color: C.primaryMid }}><Icon name="calculator" size={15}/></span>
+              <span style={{ fontSize: TY.base_, fontWeight: TY.bold, color: C.fg }}>Conteggi — {mese} {anno}</span>
             </div>
-            <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>{pAttivi.length} padroncini attivi · {giorni} giorni</span>
+            <span style={{ fontSize: TY.sm, color: C.fgSubtle, fontWeight: TY.semi }}>{pAttivi.length} padroncini attivi · {giorni} giorni</span>
           </div>
 
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ background: "#f8fafc" }}>
+                <tr style={{ background: C.bgPage }}>
                   {[
-                    ["Padroncino", "left", 160],
-                    ["Fattura", "right", 100],
-                    ["Addebiti", "right", 100],
-                    ["Bonifico", "right", 110],
-                    ["Stato", "left", 110],
-                    ["Distrib.", "center", 60],
-                    ["PDF", "center", 50],
-                    ["Fatt.", "center", 50],
-                    ["TU", "center", 50],
+                    ["Padroncino", "left",   160],
+                    ["Fattura",   "right",   100],
+                    ["Addebiti",  "right",   100],
+                    ["Bonifico",  "right",   110],
+                    ["Stato",     "left",    110],
+                    ["Distrib.",  "center",   60],
+                    ["PDF",       "center",   50],
+                    ["Fatt.",     "center",   50],
+                    ["TU",        "center",   50],
                   ].map(([h, align, w]) => (
                     <th key={h} style={{
-                      padding: "9px 10px", textAlign: align, fontSize: 9, fontWeight: 700, color: "#94a3b8",
-                      textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "2px solid #e2e8f0",
-                      whiteSpace: "nowrap", width: w, minWidth: w
+                      padding: "9px 10px", textAlign: align, fontSize: TY.xxs, fontWeight: TY.bold,
+                      color: C.fgSubtle, textTransform: "uppercase", letterSpacing: "0.05em",
+                      borderBottom: `2px solid ${C.border}`, whiteSpace: "nowrap", width: w, minWidth: w,
                     }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {pAttivi.map((p, i) => {
-                  const c = meseConteggi.find(item => item.padroncino_id === p.id);
+                  const c     = meseConteggi.find(item => item.padroncino_id === p.id);
                   const isAlt = i % 2 !== 0;
                   const bonif = c?.totale_da_bonificare || 0;
+                  const rowBg = isAlt ? C.bgRowAlt : C.white;
                   return (
                     <tr key={p.id} onClick={() => loadConteggio(p)}
-                      style={{ cursor: "pointer", background: isAlt ? "#fafafa" : "#fff", transition: "background 0.1s" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                      onMouseLeave={e => e.currentTarget.style.background = isAlt ? "#fafafa" : "#fff"}>
-
+                      style={{ cursor: "pointer", background: rowBg, transition: "background 0.1s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.primaryBg}
+                      onMouseLeave={e => e.currentTarget.style.background = rowBg}
+                    >
                       {/* Nome */}
-                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{p.nome}</div>
-                        <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'DM Mono', monospace" }}>#{p.codice}</div>
+                      <td style={{ padding: SP.cell, borderBottom: `1px solid ${C.borderLight}` }}>
+                        <div style={{ fontSize: TY.md, fontWeight: TY.bold, color: C.fg }}>{p.nome}</div>
+                        <div style={{ fontSize: TY.xs, color: C.fgSubtle, fontFamily: TY.mono }}>#{p.codice}</div>
                       </td>
 
                       {/* Fattura */}
-                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                        <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: c ? "#0f172a" : "#cbd5e1" }}>
+                      <td style={{ padding: SP.cell, borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
+                        <span style={{ fontSize: TY.md, fontFamily: TY.mono, color: c ? C.fg : "#cbd5e1" }}>
                           {c ? euro(c.totale_fattura) : "—"}
                         </span>
                       </td>
 
                       {/* Addebiti */}
-                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                        <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: c ? "#dc2626" : "#cbd5e1" }}>
+                      <td style={{ padding: SP.cell, borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
+                        <span style={{ fontSize: TY.md, fontFamily: TY.mono, color: c ? C.danger : "#cbd5e1" }}>
                           {c ? euro(c.totale_addebiti) : "—"}
                         </span>
                       </td>
 
                       {/* Bonifico */}
-                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                      <td style={{ padding: SP.cell, borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                         {c ? (
                           <span style={{
-                            fontSize: 12, fontFamily: "'DM Mono', monospace", fontWeight: 700,
-                            color: bonif >= 0 ? "#166534" : "#dc2626",
-                            background: bonif >= 0 ? "#f0fdf4" : "#fff1f2",
-                            padding: "2px 7px", borderRadius: 5, display: "inline-block"
+                            fontSize: TY.md, fontFamily: TY.mono, fontWeight: TY.bold,
+                            color:      bonif >= 0 ? C.success  : C.danger,
+                            background: bonif >= 0 ? C.successBg : "#fff1f2",
+                            padding: "2px 7px", borderRadius: BR.sm, display: "inline-block",
                           }}>{euro(bonif)}</span>
-                        ) : <span style={{ color: "#cbd5e1", fontSize: 12 }}>—</span>}
+                        ) : <span style={{ color: "#cbd5e1", fontSize: TY.md }}>—</span>}
                       </td>
 
                       {/* Stato */}
-                      <td style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: SP.cell, borderBottom: `1px solid ${C.borderLight}` }}>
                         {c
                           ? <Badge label={(c.distrib_inviata && c.pdf_addeb && c.fattura_ricevuta && c.fatt_tu_creata) ? "Completato" : "In corso"} color={(c.distrib_inviata && c.pdf_addeb && c.fattura_ricevuta && c.fatt_tu_creata) ? "success" : "warning"} />
                           : <Badge label="Mancante" color="neutral" />}
@@ -226,7 +253,7 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
 
                       {/* Flag booleani */}
                       {[c?.distrib_inviata, c?.pdf_addeb, c?.fattura_ricevuta, c?.fatt_tu_creata].map((v, j) => (
-                        <td key={j} style={{ padding: "7px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
+                        <td key={j} style={{ padding: SP.cell, borderBottom: `1px solid ${C.borderLight}`, textAlign: "center" }}>
                           <Chk v={v} />
                         </td>
                       ))}
@@ -239,21 +266,19 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
 
           {/* Footer totali */}
           {meseConteggi.length > 0 && (
-            <div style={{ borderTop: "2px solid #e2e8f0", background: "#f8fafc", padding: "10px 18px", display: "flex", gap: 24, alignItems: "center" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>Totali mese</span>
+            <div style={{ borderTop: `2px solid ${C.border}`, background: C.bgPage, padding: "10px 18px", display: "flex", gap: 24, alignItems: "center" }}>
+              <span style={{ fontSize: TY.sm, fontWeight: TY.bold, color: C.fgMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Totali mese</span>
               <div style={{ display: "flex", gap: 20, marginLeft: "auto" }}>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", marginBottom: 1 }}>Fatturato</div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 800, color: "#1d4ed8" }}>{euro(totFatt)}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", marginBottom: 1 }}>Addebiti</div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 800, color: "#dc2626" }}>{euro(totAdd)}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", marginBottom: 1 }}>Da Bonificare</div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 800, color: totBon >= 0 ? "#166534" : "#dc2626" }}>{euro(totBon)}</div>
-                </div>
+                {[
+                  ["Fatturato",    euro(totFatt), C.primarySoft],
+                  ["Addebiti",     euro(totAdd),  C.danger],
+                  ["Da Bonificare",euro(totBon),  totBon >= 0 ? C.success : C.danger],
+                ].map(([label, val, color]) => (
+                  <div key={label} style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: TY.xxs, color: C.fgSubtle, fontWeight: TY.bold, textTransform: "uppercase", marginBottom: 1 }}>{label}</div>
+                    <div style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color }}>{val}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -262,71 +287,69 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
     );
   }
 
-  // ══ VISTA DETTAGLIO ══════════════════════════════════════════════════════════
+  // ─── VISTA DETTAGLIO ──────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
       {/* ── HEADER DETTAGLIO ── */}
       <div style={{
-        background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", padding: "12px 18px",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+        background: C.white, borderRadius: BR.table, border: `1px solid ${C.border}`,
+        padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center",
+        boxShadow: SH.table,
       }}>
-        {/* Sinistra: back + nome */}
+        {/* Sinistra */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={handleBack} style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8,
-            background: "#f8fafc", color: "#475569", border: "1px solid #e2e8f0", fontSize: 12, fontWeight: 700, cursor: "pointer"
+            display: "flex", alignItems: "center", gap: SP.gapXs,
+            padding: "7px 14px", borderRadius: BR.lg,
+            background: C.bgPage, color: "#475569", border: `1px solid ${C.border}`,
+            fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer",
           }}>
             <Icon name="arrowLeft" size={13}/> Indietro
           </button>
-          <div style={{ borderLeft: "1px solid #e2e8f0", paddingLeft: 12 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.01em" }}>{selPad.nome}</div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500, marginTop: 1 }}>
+          <div style={{ borderLeft: `1px solid ${C.border}`, paddingLeft: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: TY.black, color: C.fg, letterSpacing: "-0.01em" }}>{selPad.nome}</div>
+            <div style={{ fontSize: TY.sm, color: C.fgSubtle, fontWeight: TY.semi, marginTop: 1 }}>
               {mese} {anno}
-              <span style={{ margin: "0 6px", color: "#e2e8f0" }}>·</span>
-              Cod. <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#64748b" }}>{selPad.codice}</span>
-              <span style={{ margin: "0 6px", color: "#e2e8f0" }}>·</span>
+              <span style={{ margin: "0 6px", color: C.border }}>·</span>
+              Cod. <span style={{ fontFamily: TY.mono, fontWeight: TY.bold, color: C.fgMuted }}>{selPad.codice}</span>
+              <span style={{ margin: "0 6px", color: C.border }}>·</span>
               {giorni} giorni
             </div>
           </div>
         </div>
 
-        {/* Destra: controlli */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {/* Destra */}
+        <div style={{ display: "flex", gap: SP.gapSm, alignItems: "center" }}>
 
           {/* Indicatore salvataggio */}
           <div style={{ minWidth: 90, textAlign: "right" }}>
-            {saveIndicator === "saving" && (
-              <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Salvataggio...</span>
-            )}
-            {saveIndicator === "saved" && (
-              <span style={{ fontSize: 11, color: "#166534", fontWeight: 700 }}>✓ Salvato</span>
-            )}
+            {saveIndicator === "saving" && <span style={{ fontSize: TY.sm, color: C.fgSubtle, fontWeight: TY.semi }}>Salvataggio...</span>}
+            {saveIndicator === "saved"  && <span style={{ fontSize: TY.sm, color: C.success,  fontWeight: TY.bold }}>✓ Salvato</span>}
           </div>
 
-          {/* Toggle riepilogo / dettaglio */}
-          <div style={{ display: "flex", borderRadius: 9, border: "1px solid #e2e8f0", overflow: "hidden", background: "#f1f5f9", padding: 2, gap: 2 }}>
+          {/* Toggle tab */}
+          <div style={{ display: "flex", borderRadius: BR.xl, border: `1px solid ${C.border}`, overflow: "hidden", background: C.bgPage, padding: 2, gap: 2 }}>
             {["riepilogo", "dettaglio"].map(t => (
               <button key={t} onClick={() => setTab(t)} style={{
-                padding: "5px 14px", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, borderRadius: 7,
-                background: tab === t ? "#fff" : "transparent",
-                color: tab === t ? "#2563eb" : "#64748b",
-                boxShadow: tab === t ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                transition: "all 0.15s"
+                padding: "5px 14px", border: "none", cursor: "pointer", fontSize: TY.sm, fontWeight: TY.bold, borderRadius: BR.md,
+                background:  tab === t ? C.white : "transparent",
+                color:       tab === t ? C.primaryMid : C.fgMuted,
+                boxShadow:   tab === t ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                transition:  "all 0.15s",
               }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
             ))}
           </div>
 
           <button onClick={handleDuplica} style={{
-            padding: "7px 12px", borderRadius: 8, background: "#f0fdf4", color: "#166534",
-            border: "1px solid #bbf7d0", fontSize: 11, fontWeight: 700, cursor: "pointer"
+            padding: "7px 12px", borderRadius: BR.lg, background: C.successBg, color: C.success,
+            border: `1px solid ${C.successBorder}`, fontSize: TY.sm, fontWeight: TY.bold, cursor: "pointer",
           }}>Duplica</button>
 
           {hasSaved && (
             <button onClick={handleElimina} style={{
-              padding: "7px 10px", borderRadius: 8, background: "#fff1f2", color: "#dc2626",
-              border: "1px solid #fecdd3", cursor: "pointer", display: "flex", alignItems: "center"
+              padding: "7px 10px", borderRadius: BR.lg, background: "#fff1f2", color: C.danger,
+              border: "1px solid #fecdd3", cursor: "pointer", display: "flex", alignItems: "center",
             }}>
               <Icon name="trash" size={13}/>
             </button>
@@ -334,19 +357,20 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
 
           {/* Bonifico badge */}
           <div style={{
-            background: (form?.totale_da_bonificare || 0) >= 0 ? "#dcfce7" : "#fee2e2",
-            borderRadius: 10, padding: "5px 14px",
-            border: `1px solid ${(form?.totale_da_bonificare || 0) >= 0 ? "#bbf7d0" : "#fca5a5"}`
+            background:   (form?.totale_da_bonificare || 0) >= 0 ? C.successBgAlt : C.dangerBgAlt,
+            borderRadius: BR.card,
+            padding:      "5px 14px",
+            border:       `1px solid ${(form?.totale_da_bonificare || 0) >= 0 ? C.successBorder : "#fca5a5"}`,
           }}>
-            <div style={{ fontSize: 9, fontWeight: 800, color: "#64748b", textTransform: "uppercase", textAlign: "center", letterSpacing: "0.06em" }}>Bonifico</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: (form?.totale_da_bonificare || 0) >= 0 ? "#166534" : "#dc2626", fontFamily: "'DM Mono', monospace", textAlign: "center" }}>
+            <div style={{ fontSize: TY.xxs, fontWeight: TY.black, color: C.fgMuted, textTransform: "uppercase", textAlign: "center", letterSpacing: "0.06em" }}>Bonifico</div>
+            <div style={{ fontSize: 15, fontWeight: TY.black, color: (form?.totale_da_bonificare || 0) >= 0 ? C.success : C.danger, fontFamily: TY.mono, textAlign: "center" }}>
               {euro(form?.totale_da_bonificare || 0)}
             </div>
           </div>
 
           <button onClick={() => onSave(form)} style={{
-            padding: "9px 18px", borderRadius: 9, background: "#2563eb", color: "#fff",
-            border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer"
+            padding: "9px 18px", borderRadius: BR.xl, background: C.primaryMid,
+            color: "#fff", border: "none", fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer",
           }}>Salva</button>
         </div>
       </div>
@@ -363,7 +387,20 @@ export const ConteggiEditor = ({ padroncini, conteggi, mese, anno, onSave, onDel
         externalTab={tab}
         addebiti_standard={addebiti_standard}
         ricaricheMese={ricariche[`${mese}_${anno}`] || {}}
-        mezziFlotta={mezziFlotta.filter(m => m.padroncino_id === selPad?.id)}
+        mezziFlotta={(() => {
+          // Confronto stringa per evitare type mismatch (es. "123" vs 123)
+          const filtrati = mezziFlotta.filter(m => String(m.padroncino_id) === String(selPad?.id));
+          // Fallback: se nessun mezzo ha padroncino_id corrispondente, usa mezzi embedded nel padroncino
+          if (filtrati.length > 0) return filtrati;
+          return (selPad?.mezzi || [])
+            .filter(m => m.targa)
+            .map(m => ({
+              ...m,
+              // Normalizza il campo importo: embedded usa tariffa_mensile, flotta usa rata_noleggio
+              rata_noleggio: m.rata_noleggio || m.tariffa_mensile || 0,
+              alimentazione: m.alimentazione || m.tipologia || "",
+            }));
+        })()}
       />
     </div>
   );

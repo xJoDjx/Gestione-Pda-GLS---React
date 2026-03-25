@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Icon } from "./Icons";
 import { Badge, SectionCard, DocUpload } from "./BaseComponents";
 import { euro, durcColor, dvrColor, statoColor, durcDaysLeft, MESI } from "../utils/formatters";
+import { C, SP, TY, BR, SH, statoStyle } from "./theme";
 
 // ─── CAMPI MONITORATI per cronologia (tutti i campi significativi) ─────────────
 const WATCH_FIELDS = [
@@ -31,28 +32,29 @@ const makeEntry = (logCampi, utente = "") => ({
   utente,
 });
 
-// ─── STILI CELLE ──────────────────────────────────────────────────────────────
+// ─── STILI CELLE — da theme.js ────────────────────────────────────────────────
 const ci = {
-  width: "100%", padding: "5px 7px", border: "1px solid #e2e8f0",
-  borderRadius: 6, fontSize: 11, background: "#fff", color: "#0f172a",
-  outline: "none", boxSizing: "border-box", fontFamily: "inherit"
+  width: "100%", padding: "5px 7px", border: `1px solid ${C.border}`,
+  borderRadius: BR.md, fontSize: TY.md, background: C.white, color: C.fg,
+  outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+  transition: "border-color 0.15s",
 };
-const ciMono = { ...ci, fontFamily: "'DM Mono', monospace" };
-const ciDate = { ...ci, fontSize: 11 };
+const ciMono = { ...ci, fontFamily: TY.mono };
+const ciDate = { ...ci };
 
 const TH = ({ children, w }) => (
   <th style={{
-    padding: "8px 8px", textAlign: "left", fontSize: 10, fontWeight: 700,
-    color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em",
-    borderBottom: "2px solid #e2e8f0", whiteSpace: "nowrap",
-    background: "#f8fafc", width: w || "auto"
+    padding: "7px 10px", textAlign: "left", fontSize: TY.xs, fontWeight: TY.black,
+    color: C.fgMuted, textTransform: "uppercase", letterSpacing: "0.05em",
+    borderBottom: `2px solid ${C.border}`, whiteSpace: "nowrap",
+    background: C.bgPage, width: w || "auto",
   }}>{children}</th>
 );
 const TD = ({ children, center, w }) => (
   <td style={{
-    padding: "6px 8px", borderBottom: "1px solid #f1f5f9",
+    padding: "5px 8px", borderBottom: `1px solid ${C.borderLight}`,
     verticalAlign: "middle", textAlign: center ? "center" : "left",
-    width: w || "auto"
+    width: w || "auto",
   }}>{children}</td>
 );
 
@@ -154,7 +156,7 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
       return;
     }
     if (field === "__ADD__") {
-      const newRows = [...rows, { targa: "", alimentazione: "Diesel", marca: "", modello: "", stato: "ATTIVO", data_inizio: "", data_fine: "", tariffa_mensile: 0, doc: null, note: "" }];
+      const newRows = [...rows, { targa: "", alimentazione: "", marca: "", modello: "", stato: "ATTIVO", data_inizio: "", data_fine: "", tariffa_mensile: 0, doc: null, note: "" }];
       onChange(newRows);
       return;
     }
@@ -163,86 +165,139 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
 
   return (
     <div>
-      <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+      <div style={{ overflowX: "auto", borderRadius: BR.card, border: `1px solid ${C.border}`, boxShadow: SH.table }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: 90 }} />
+            <col style={{ width: 95 }} />
+            <col style={{ width: 210 }} />
             <col style={{ width: 80 }} />
-            <col style={{ width: 90 }} />
-            <col style={{ width: 90 }} />
-            <col style={{ width: 75 }} />
-            <col style={{ width: 95 }} />
-            <col style={{ width: 95 }} />
-            <col style={{ width: 95 }} />
-            <col style={{ width: 60 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 105 }} />
+            <col style={{ width: 44 }} />
             <col />
-            <col style={{ width: 36 }} />
+            <col style={{ width: 32 }} />
           </colgroup>
           <thead>
             <tr>
-              <TH>Targa</TH><TH>Alim.</TH><TH>Marca</TH><TH>Modello</TH>
-              <TH>Stato</TH><TH>Inizio</TH><TH>Fine</TH><TH>Tariffa €/mese</TH>
+              <TH>Targa</TH><TH>Marca / Modello / Alim.</TH><TH>Stato</TH>
+              <TH>Inizio</TH><TH>Fine</TH><TH>Tariffa €/mese</TH>
               <TH>Doc.</TH><TH>Note</TH><TH></TH>
             </tr>
           </thead>
           <tbody>
-            {rows.map((m, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                <TD><input value={m.targa || ""} onChange={e => update(i, "targa", e.target.value)} style={{ ...ciMono, textTransform: "uppercase" }} placeholder="AA000AA" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+            {rows.map((m, i) => {
+              // ── Badge alimentazione ──────────────────────────────────────────
+              const alim = (m.alimentazione || "").toLowerCase();
+              const alimStyle = alim.includes("eletro") || alim.includes("elettr")
+                ? { bg: C.primaryBgAlt, color: C.primarySoft }
+                : alim.includes("ibrido") || alim.includes("mhev")
+                ? { bg: C.successBgAlt, color: C.success }
+                : alim.includes("benzina")
+                ? { bg: C.warningBgAlt, color: C.warning }
+                : { bg: C.bgPage, color: C.fgMuted };
+
+              // ── Badge stato ──────────────────────────────────────────────────
+              const statoM = (m.stato || "ATTIVO").toUpperCase();
+              const statoMStyle = statoM === "ATTIVO"
+                ? { bg: C.successBgAlt, color: C.success }
+                : statoM === "FERMO"
+                ? { bg: C.warningBgAlt, color: C.warning }
+                : { bg: C.mutedBg, color: C.muted };
+
+              return (
+              <tr key={i} style={{ background: i % 2 === 0 ? C.white : C.bgRowAlt }}>
+                {/* Targa — input libero */}
                 <TD>
-                  <select value={m.alimentazione || "Diesel"} onChange={e => update(i, "alimentazione", e.target.value)} style={{ ...ci, fontSize: 11 }}>
-                    {["Diesel","Benzina","Ibrido","Elettrico","GPL","Metano"].map(a => <option key={a}>{a}</option>)}
-                  </select>
+                  <input value={m.targa || ""} onChange={e => update(i, "targa", e.target.value)}
+                    style={{ ...ciMono, textTransform: "uppercase" }} placeholder="AA000AA"
+                    onFocus={e => e.target.style.borderColor = C.primaryMid}
+                    onBlur={e => e.target.style.borderColor = C.border} />
                 </TD>
-                <TD><input value={m.marca || ""} onChange={e => update(i, "marca", e.target.value)} style={ci} placeholder="Fiat" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input value={m.modello || ""} onChange={e => update(i, "modello", e.target.value)} style={ci} placeholder="Ducato" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+
+                {/* Marca / Modello / Alimentazione — badge read-only */}
                 <TD>
-                  <select value={m.stato || "ATTIVO"} onChange={e => update(i, "stato", e.target.value)} style={{ ...ci, fontSize: 11 }}>
-                    {["ATTIVO","FERMO","DISMESSO"].map(s => <option key={s}>{s}</option>)}
-                  </select>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                    {m.marca && (
+                      <span style={{ fontSize: TY.xs, fontWeight: TY.black, color: C.fg }}>
+                        {m.marca}
+                      </span>
+                    )}
+                    {m.modello && (
+                      <span style={{ fontSize: TY.xs, fontWeight: TY.bold, color: C.fgMuted }}>
+                        {m.modello}
+                      </span>
+                    )}
+                    {(!m.marca && !m.modello) && (
+                      <span style={{ fontSize: TY.xs, color: C.fgSubtle, fontStyle: "italic" }}>—</span>
+                    )}
+                    {m.alimentazione && (
+                      <span style={{ fontSize: 9, fontWeight: TY.bold, padding: "1px 6px", borderRadius: BR.xs, background: alimStyle.bg, color: alimStyle.color, whiteSpace: "nowrap" }}>
+                        {m.alimentazione.includes("elettr") || m.alimentazione.includes("Elettr") ? "⚡ " : ""}{m.alimentazione}
+                      </span>
+                    )}
+                  </div>
                 </TD>
-                <TD><input type="date" value={m.data_inizio || ""} onChange={e => update(i, "data_inizio", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="date" value={m.data_fine || ""} onChange={e => update(i, "data_fine", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="number" step="0.01" value={m.tariffa_mensile || ""} onChange={e => update(i, "tariffa_mensile", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+
+                {/* Stato — badge read-only */}
+                <TD>
+                  <span style={{ fontSize: TY.xs, fontWeight: TY.bold, padding: "2px 7px", borderRadius: BR.sm, background: statoMStyle.bg, color: statoMStyle.color, whiteSpace: "nowrap" }}>
+                    {m.stato || "ATTIVO"}
+                  </span>
+                </TD>
+
+                {/* Date — input */}
+                <TD><input type="date" value={m.data_inizio || ""} onChange={e => update(i, "data_inizio", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="date" value={m.data_fine || ""} onChange={e => update(i, "data_fine", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+
+                {/* Tariffa — input */}
+                <TD><input type="number" step="0.01" value={m.tariffa_mensile || ""} onChange={e => update(i, "tariffa_mensile", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+
+                {/* Doc */}
                 <TD center>
                   {m.doc ? (
                     <button onClick={() => apriFileNativo(m.doc)} title="Apri doc"
-                      style={{ padding: "3px 7px", borderRadius: 5, background: "#eff6ff", border: "none", color: "#1d4ed8", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>PDF</button>
+                      style={{ padding: "3px 7px", borderRadius: BR.sm, background: C.primaryBg, border: "none", color: C.primarySoft, fontSize: TY.xs, cursor: "pointer", fontWeight: TY.bold }}>PDF</button>
                   ) : (
                     <label style={{ cursor: "pointer" }}>
-                      <span style={{ padding: "3px 7px", borderRadius: 5, background: "#f1f5f9", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: 10, cursor: "pointer" }}>+</span>
+                      <span style={{ padding: "3px 7px", borderRadius: BR.sm, background: C.bgPage, border: `1px dashed ${C.border}`, color: C.fgSubtle, fontSize: TY.xs }}>+</span>
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }}
                         onChange={e => { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = ev => update(i, "doc", { name: file.name, data: ev.target.result }); r.readAsDataURL(file); }} />
                     </label>
                   )}
                 </TD>
-                <TD><input value={m.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..." onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+
+                {/* Note */}
+                <TD><input value={m.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..." onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+
+                {/* Elimina */}
                 <TD center>
-                  <button onClick={() => update(i, "__DELETE__")} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 5, padding: "4px 6px", cursor: "pointer" }}>
+                  <button onClick={() => update(i, "__DELETE__")} style={{ background: C.dangerBgAlt, color: C.danger, border: "none", borderRadius: BR.sm, padding: "4px 6px", cursor: "pointer" }}>
                     <Icon name="x" size={12} />
                   </button>
                 </TD>
               </tr>
-            ))}
+              );
+            })}
             {rows.length === 0 && (
-              <tr><td colSpan={11} style={{ textAlign: "center", padding: "18px", color: "#94a3b8", fontSize: 12 }}>Nessun mezzo — Clicca "+ Aggiungi"</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: "center", padding: "18px", color: C.fgSubtle, fontSize: TY.md }}>Nessun mezzo — Clicca "+ Aggiungi"</td></tr>
             )}
           </tbody>
         </table>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-        <button onClick={() => update(0, "__ADD__")} style={{ padding: "7px 14px", borderRadius: 8, background: "#f0fdf4", border: "1px dashed #86efac", color: "#166534", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+        <button onClick={() => update(0, "__ADD__")} style={{ padding: "7px 14px", borderRadius: BR.lg, background: C.successBg, border: `1px dashed ${C.successBorder}`, color: C.success, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
           <Icon name="plus" size={12} /> Aggiungi Manuale
         </button>
         {disponibili.length > 0 && (
-          <button onClick={() => setShowPicker(v => !v)} style={{ padding: "7px 14px", borderRadius: 8, background: "#eff6ff", border: "1px dashed #bfdbfe", color: "#1d4ed8", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+          <button onClick={() => setShowPicker(v => !v)} style={{ padding: "7px 14px", borderRadius: BR.lg, background: C.primaryBg, border: `1px dashed ${C.primaryBorder}`, color: C.primarySoft, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
             <Icon name="truck" size={12} /> Da Flotta ({disponibili.length} disponibili)
           </button>
         )}
       </div>
       {showPicker && disponibili.length > 0 && (
-        <div style={{ marginTop: 10, background: "#f0f9ff", borderRadius: 10, border: "1px solid #bfdbfe", padding: "12px 14px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ marginTop: 10, background: C.primaryBg, borderRadius: BR.card, border: `1px solid ${C.primaryBorder}`, padding: "12px 14px" }}>
+          <div style={{ fontSize: TY.xs, fontWeight: TY.black, color: C.primarySoft, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Seleziona dalla Flotta Mezzi
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -251,7 +306,7 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
                 const newRows = [...rows, {
                   targa: m.targa, alimentazione: m.alimentazione || "Diesel",
                   marca: m.marca || "", modello: m.modello || "",
-                  stato: "ATTIVO", data_inizio: new Date().toISOString().slice(0, 10),
+                  stato: m.stato === "DISPONIBILE" ? "ATTIVO" : (m.stato || "ATTIVO"), data_inizio: new Date().toISOString().slice(0, 10),
                   data_fine: "", tariffa_mensile: m.rata_noleggio || 0, note: ""
                 }];
                 onChange(newRows);
@@ -262,9 +317,9 @@ const TabMezzi = ({ mezzi, onChange, mezziFlotta = [], onSaveMezzoFlotta, onAuto
                 const logCampi = [{ label: "Mezzo assegnato", da: "—", a: m.targa }];
                 if (onAutoSave) onAutoSave(newRows, "mezzi", rows, logCampi);
                 setShowPicker(false);
-              }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #bfdbfe", color: "#1d4ed8", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
+              }} style={{ padding: "6px 12px", borderRadius: BR.lg, background: C.white, border: `1px solid ${C.primaryBorder}`, color: C.primarySoft, fontSize: TY.md, fontWeight: TY.semi, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{m.targa}</span>
-                <span style={{ color: "#94a3b8" }}>{m.alimentazione || ""} {m.marca || ""} {m.modello || ""}</span>
+                <span style={{ color: C.fgSubtle, fontSize: TY.md }}>{m.alimentazione || ""} {m.marca || ""} {m.modello || ""}</span>
               </button>
             ))}
           </div>
@@ -306,12 +361,12 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
 
   return (
     <div>
-      <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+      <div style={{ overflowX: "auto", borderRadius: BR.card, border: `1px solid ${C.border}`, boxShadow: SH.table }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: 120 }} /><col style={{ width: 120 }} /><col style={{ width: 75 }} />
-            <col style={{ width: 95 }} /><col style={{ width: 95 }} /><col style={{ width: 95 }} />
-            <col style={{ width: 60 }} /><col /><col style={{ width: 36 }} />
+            <col style={{ width: 130 }} /><col style={{ width: 130 }} /><col style={{ width: 85 }} />
+            <col style={{ width: 105 }} /><col style={{ width: 105 }} /><col style={{ width: 110 }} />
+            <col style={{ width: 50 }} /><col style={{ width: 120 }} /><col style={{ width: 36 }} />
           </colgroup>
           <thead>
             <tr>
@@ -322,66 +377,68 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
           </thead>
           <tbody>
             {rows.map((p, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                <TD><input value={p.seriale || ""} onChange={e => update(i, "seriale", e.target.value)} style={ciMono} placeholder="SN001" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input value={p.codice_associato || ""} onChange={e => update(i, "codice_associato", e.target.value)} style={ci} placeholder="COD..." onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+              <tr key={i} style={{ background: i % 2 === 0 ? C.white : C.bgRowAlt }}>
+                <TD><input value={p.seriale || ""} onChange={e => update(i, "seriale", e.target.value)} style={ciMono} placeholder="SN001" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input value={p.codice_associato || ""} onChange={e => update(i, "codice_associato", e.target.value)} style={ci} placeholder="COD..." onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
                 <TD>
                   <select value={p.stato || "ATTIVO"} onChange={e => update(i, "stato", e.target.value)} style={{ ...ci, fontSize: 11 }}>
                     {["ATTIVO","GUASTO","DISMESSO"].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </TD>
-                <TD><input type="date" value={p.data_inizio || ""} onChange={e => update(i, "data_inizio", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="date" value={p.data_fine || ""} onChange={e => update(i, "data_fine", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="number" step="0.01" value={p.tariffa_mensile || ""} onChange={e => update(i, "tariffa_mensile", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+                <TD><input type="date" value={p.data_inizio || ""} onChange={e => update(i, "data_inizio", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="date" value={p.data_fine || ""} onChange={e => update(i, "data_fine", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="number" step="0.01" value={p.tariffa_mensile || ""} onChange={e => update(i, "tariffa_mensile", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
                 <TD center>
                   {p.doc ? (
                     <button onClick={() => apriFileNativo(p.doc)} title="Apri doc"
-                      style={{ padding: "3px 7px", borderRadius: 5, background: "#eff6ff", border: "none", color: "#1d4ed8", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>PDF</button>
+                      style={{ padding: "3px 7px", borderRadius: BR.sm, background: C.primaryBg, border: "none", color: C.primarySoft, fontSize: TY.xs, cursor: "pointer", fontWeight: TY.bold }}>PDF</button>
                   ) : (
                     <label style={{ cursor: "pointer" }}>
-                      <span style={{ padding: "3px 7px", borderRadius: 5, background: "#f1f5f9", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: 10 }}>+</span>
+                      <span style={{ padding: "3px 7px", borderRadius: BR.sm, background: C.bgPage, border: `1px dashed ${C.border}`, color: C.fgSubtle, fontSize: TY.xs }}>+</span>
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }}
                         onChange={e => { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = ev => update(i, "doc", { name: file.name, data: ev.target.result }); r.readAsDataURL(file); }} />
                     </label>
                   )}
                 </TD>
-                <TD><input value={p.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..." onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+                <TD><input value={p.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..." onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
                 <TD center>
-                  <button onClick={() => update(i, "__DELETE__")} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 5, padding: "4px 6px", cursor: "pointer" }}>
+                  <button onClick={() => update(i, "__DELETE__")} style={{ background: C.dangerBgAlt, color: C.danger, border: "none", borderRadius: BR.sm, padding: "4px 6px", cursor: "pointer" }}>
                     <Icon name="x" size={12} />
                   </button>
                 </TD>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={9} style={{ textAlign: "center", padding: "18px", color: "#94a3b8", fontSize: 12 }}>Nessun palmare — Clicca "+ Aggiungi"</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: "center", padding: "18px", color: C.fgSubtle, fontSize: TY.md }}>Nessun palmare — Clicca "+ Aggiungi"</td></tr>
             )}
           </tbody>
         </table>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-        <button onClick={() => update(0, "__ADD__")} style={{ padding: "7px 14px", borderRadius: 8, background: "#faf5ff", border: "1px dashed #c4b5fd", color: "#6d28d9", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+        <button onClick={() => update(0, "__ADD__")} style={{ padding: "7px 14px", borderRadius: BR.lg, background: C.violetBg, border: `1px dashed ${C.violetBorder}`, color: C.violet, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
           <Icon name="plus" size={12} /> Aggiungi Manuale
         </button>
         {disponibili.length > 0 && (
-          <button onClick={() => setShowPicker(v => !v)} style={{ padding: "7px 14px", borderRadius: 8, background: "#f5f3ff", border: "1px dashed #c4b5fd", color: "#6d28d9", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+          <button onClick={() => setShowPicker(v => !v)} style={{ padding: "7px 14px", borderRadius: BR.lg, background: C.violetBgAlt, border: `1px dashed ${C.violetBorder}`, color: C.violet, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
             <Icon name="device" size={12} /> Da Flotta ({disponibili.length} disponibili)
           </button>
         )}
       </div>
       {showPicker && disponibili.length > 0 && (
-        <div style={{ marginTop: 10, background: "#faf5ff", borderRadius: 10, border: "1px solid #c4b5fd", padding: "12px 14px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#6d28d9", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ marginTop: 10, background: C.violetBg, borderRadius: BR.card, border: `1px solid ${C.violetBorder}`, padding: "12px 14px" }}>
+          <div style={{ fontSize: TY.xs, fontWeight: TY.black, color: C.violet, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Seleziona dalla Flotta Palmari
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {disponibili.map(p => (
               <button key={p.id} onClick={() => {
                 const newRows = [...rows, {
-                  seriale: p.seriale, codice_associato: "", stato: "ATTIVO",
+                  seriale: p.seriale, codice_associato: "",
+                  stato: p.stato === "DISPONIBILE" ? "ATTIVO" : (p.stato || "ATTIVO"),
+                  modello: p.modello_custom || p.modello || "",
                   data_inizio: new Date().toISOString().slice(0, 10),
                   data_fine: "", tariffa_mensile: p.tariffa_mensile || 0,
-                  note: p.modello || ""
+                  note: p.note || "",
                 }];
                 onChange(newRows);
                 if (onSavePalmare) {
@@ -391,9 +448,9 @@ const TabPalmari = ({ palmari, onChange, palmariFlotta = [], onSavePalmare, onAu
                 const logCampi = [{ label: "Palmare assegnato", da: "—", a: p.seriale }];
                 if (onAutoSave) onAutoSave(newRows, "palmari", rows, logCampi);
                 setShowPicker(false);
-              }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #c4b5fd", color: "#6d28d9", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
+              }} style={{ padding: "6px 12px", borderRadius: BR.lg, background: C.white, border: `1px solid ${C.violetBorder}`, color: C.violet, fontSize: TY.md, fontWeight: TY.semi, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{p.seriale}</span>
-                {p.modello && <span style={{ color: "#94a3b8" }}>{p.modello}</span>}
+                {p.modello && <span style={{ color: C.fgSubtle, fontSize: TY.md }}>{p.modello}</span>}
               </button>
             ))}
           </div>
@@ -439,12 +496,12 @@ const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista
 
   return (
     <div>
-      <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+      <div style={{ overflowX: "auto", borderRadius: BR.card, border: `1px solid ${C.border}`, boxShadow: SH.table }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: 100 }} /><col style={{ width: 105 }} /><col style={{ width: 105 }} />
-            <col style={{ width: 90 }} /><col style={{ width: 90 }} /><col style={{ width: 100 }} />
-            <col style={{ width: 100 }} /><col style={{ width: 70 }} /><col /><col style={{ width: 44 }} />
+            <col style={{ width: 110 }} /><col style={{ width: 115 }} /><col style={{ width: 115 }} />
+            <col style={{ width: 90 }} /><col style={{ width: 95 }} /><col style={{ width: 108 }} />
+            <col style={{ width: 108 }} /><col style={{ width: 50 }} /><col style={{ width: 120 }} /><col style={{ width: 40 }} />
           </colgroup>
           <thead>
             <tr>
@@ -455,53 +512,53 @@ const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista
           </thead>
           <tbody>
             {rows.map((a, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
-                <TD><input value={a.codice || ""} onChange={e => update(i, "codice", e.target.value)} style={ci} placeholder="AUT001" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="number" step="0.01" value={a.tariffa_fissa || ""} onChange={e => update(i, "tariffa_fissa", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="number" step="0.01" value={a.tariffa_ritiro || ""} onChange={e => update(i, "tariffa_ritiro", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="number" step="1" value={a.target || ""} onChange={e => update(i, "target", parseInt(e.target.value) || 0)} style={ciMono} placeholder="0" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="number" step="0.01" value={a.bonus_malus || ""} onChange={e => update(i, "bonus_malus", parseFloat(e.target.value) || 0)} style={{ ...ciMono, color: (a.bonus_malus || 0) >= 0 ? "#166534" : "#dc2626" }} placeholder="0,00" onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="date" value={a.data_inizio || ""} onChange={e => update(i, "data_inizio", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
-                <TD><input type="date" value={a.data_fine || ""} onChange={e => update(i, "data_fine", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+              <tr key={i} style={{ background: i % 2 === 0 ? C.white : C.bgRowAlt }}>
+                <TD><input value={a.codice || ""} onChange={e => update(i, "codice", e.target.value)} style={ci} placeholder="AUT001" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="number" step="0.01" value={a.tariffa_fissa || ""} onChange={e => update(i, "tariffa_fissa", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="number" step="0.01" value={a.tariffa_ritiro || ""} onChange={e => update(i, "tariffa_ritiro", parseFloat(e.target.value) || 0)} style={ciMono} placeholder="0,00" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="number" step="1" value={a.target || ""} onChange={e => update(i, "target", parseInt(e.target.value) || 0)} style={ciMono} placeholder="0" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="number" step="0.01" value={a.bonus_malus || ""} onChange={e => update(i, "bonus_malus", parseFloat(e.target.value) || 0)} style={{ ...ciMono, color: (a.bonus_malus || 0) >= 0 ? C.success : C.danger }} placeholder="0,00" onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="date" value={a.data_inizio || ""} onChange={e => update(i, "data_inizio", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
+                <TD><input type="date" value={a.data_fine || ""} onChange={e => update(i, "data_fine", e.target.value)} style={ciDate} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
                 <TD center>
                   {a.doc ? (
                     <button onClick={() => apriFileNativo(a.doc)} title="Apri doc"
-                      style={{ padding: "3px 7px", borderRadius: 5, background: "#eff6ff", border: "none", color: "#1d4ed8", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>PDF</button>
+                      style={{ padding: "3px 7px", borderRadius: BR.sm, background: C.primaryBg, border: "none", color: C.primarySoft, fontSize: TY.xs, cursor: "pointer", fontWeight: TY.bold }}>PDF</button>
                   ) : (
                     <label style={{ cursor: "pointer" }}>
-                      <span style={{ padding: "3px 7px", borderRadius: 5, background: "#f1f5f9", border: "1px dashed #cbd5e1", color: "#94a3b8", fontSize: 10 }}>+</span>
+                      <span style={{ padding: "3px 7px", borderRadius: BR.sm, background: C.bgPage, border: `1px dashed ${C.border}`, color: C.fgSubtle, fontSize: TY.xs }}>+</span>
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }}
                         onChange={e => { const file = e.target.files[0]; if (!file) return; const r = new FileReader(); r.onload = ev => update(i, "doc", { name: file.name, data: ev.target.result }); r.readAsDataURL(file); }} />
                     </label>
                   )}
                 </TD>
-                <TD><input value={a.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..." onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></TD>
+                <TD><input value={a.note || ""} onChange={e => update(i, "note", e.target.value)} style={ci} placeholder="Note..." onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></TD>
                 <TD center>
-                  <button onClick={() => update(i, "__DELETE__")} style={{ background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 5, padding: "4px 6px", cursor: "pointer" }}>
+                  <button onClick={() => update(i, "__DELETE__")} style={{ background: C.dangerBgAlt, color: C.danger, border: "none", borderRadius: BR.sm, padding: "4px 6px", cursor: "pointer" }}>
                     <Icon name="x" size={12} />
                   </button>
                 </TD>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={10} style={{ textAlign: "center", padding: "18px", color: "#94a3b8", fontSize: 12 }}>Nessun codice autista — Clicca "+ Aggiungi"</td></tr>
+              <tr><td colSpan={10} style={{ textAlign: "center", padding: "18px", color: C.fgSubtle, fontSize: TY.md }}>Nessun codice autista — Clicca "+ Aggiungi"</td></tr>
             )}
           </tbody>
         </table>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-        <button onClick={() => update(0, "__ADD__")} style={{ padding: "7px 14px", borderRadius: 8, background: "#fffbeb", border: "1px dashed #fcd34d", color: "#92400e", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+        <button onClick={() => update(0, "__ADD__")} style={{ padding: "7px 14px", borderRadius: BR.lg, background: C.warningBg, border: `1px dashed ${C.warningBorder}`, color: C.warning, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
           <Icon name="plus" size={12} /> Aggiungi Manuale
         </button>
         {disponibili.length > 0 && (
-          <button onClick={() => setShowPicker(v => !v)} style={{ padding: "7px 14px", borderRadius: 8, background: "#fef3c7", border: "1px dashed #fcd34d", color: "#78350f", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+          <button onClick={() => setShowPicker(v => !v)} style={{ padding: "7px 14px", borderRadius: BR.lg, background: C.warningBgAlt, border: `1px dashed ${C.warningBorder}`, color: C.warning, fontSize: TY.md, fontWeight: TY.bold, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
             <Icon name="users" size={12} /> Da Flotta ({disponibili.length} disponibili)
           </button>
         )}
       </div>
       {showPicker && disponibili.length > 0 && (
-        <div style={{ marginTop: 10, background: "#fffbeb", borderRadius: 10, border: "1px solid #fcd34d", padding: "12px 14px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ marginTop: 10, background: C.warningBg, borderRadius: BR.card, border: `1px solid ${C.warningBorder}`, padding: "12px 14px" }}>
+          <div style={{ fontSize: TY.xs, fontWeight: TY.black, color: C.warning, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Seleziona dalla Flotta Codici Autisti
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -521,10 +578,10 @@ const TabAutisti = ({ autisti, onChange, codAutistiFlotta = [], onSaveCodAutista
                 const logCampi = [{ label: "Cod. Autista assegnato", da: "—", a: a.codice }];
                 if (onAutoSave) onAutoSave(newRows, "codici_autisti", rows, logCampi);
                 setShowPicker(false);
-              }} style={{ padding: "6px 12px", borderRadius: 7, background: "#fff", border: "1px solid #fcd34d", color: "#78350f", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
+              }} style={{ padding: "6px 12px", borderRadius: BR.lg, background: C.white, border: `1px solid ${C.warningBorder}`, color: C.warning, fontSize: TY.md, fontWeight: TY.semi, cursor: "pointer", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 800 }}>{a.codice}</span>
-                {a.tariffa_fissa > 0 && <span style={{ color: "#166534", fontSize: 11 }}>€{a.tariffa_fissa}/fissa</span>}
-                {a.note && <span style={{ color: "#94a3b8", fontSize: 11 }}>{a.note.slice(0, 20)}</span>}
+                {a.tariffa_fissa > 0 && <span style={{ color: C.success, fontSize: TY.sm }}>€{a.tariffa_fissa}/fissa</span>}
+                {a.note && <span style={{ color: C.fgSubtle, fontSize: TY.sm }}>{a.note.slice(0, 20)}</span>}
               </button>
             ))}
           </div>
@@ -834,21 +891,21 @@ export const PadroncinoDetail = ({
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <SectionCard title="Dati Anagrafici" icon="user" accent="#1e40af">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-              <div><label style={labelSt}>Ragione Sociale</label><input value={form.nome || ""} onChange={e => update("nome", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div><label style={labelSt}>Codice GLS</label><input value={form.codice || ""} onChange={e => update("codice", e.target.value)} style={{ ...fieldCi, fontFamily: "'DM Mono',monospace" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div><label style={labelSt}>Ragione Sociale</label><input value={form.nome || ""} onChange={e => update("nome", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div><label style={labelSt}>Codice GLS</label><input value={form.codice || ""} onChange={e => update("codice", e.target.value)} style={{ ...fieldCi, fontFamily: "'DM Mono',monospace" }} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
               <div>
                 <label style={labelSt}>Stato</label>
                 <select value={form.stato || ""} onChange={e => update("stato", e.target.value)} style={{ ...fieldCi, cursor: "pointer" }}>
                   {["ATTIVO", "DISMESSO", "SOSPESO"].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
-              <div><label style={labelSt}>Partita IVA</label><input value={form.partita_iva || ""} onChange={e => update("partita_iva", e.target.value)} style={{ ...fieldCi, fontFamily: "'DM Mono',monospace" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div><label style={labelSt}>Codice Fiscale</label><input value={form.codice_fiscale || ""} onChange={e => update("codice_fiscale", e.target.value)} style={{ ...fieldCi, fontFamily: "'DM Mono',monospace" }} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div><label style={labelSt}>Rappresentante</label><input value={form.rappresentante || ""} onChange={e => update("rappresentante", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div><label style={labelSt}>Telefono</label><input value={form.telefono || ""} onChange={e => update("telefono", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div><label style={labelSt}>Email</label><input value={form.email || ""} onChange={e => update("email", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div><label style={labelSt}>Sede Legale</label><input value={form.sede_legale || ""} onChange={e => update("sede_legale", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
-              <div style={{ gridColumn: "span 3" }}><label style={labelSt}>Via / Sede Operativa</label><input value={form.via_sede_legale || ""} onChange={e => update("via_sede_legale", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div><label style={labelSt}>Partita IVA</label><input value={form.partita_iva || ""} onChange={e => update("partita_iva", e.target.value)} style={{ ...fieldCi, fontFamily: "'DM Mono',monospace" }} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div><label style={labelSt}>Codice Fiscale</label><input value={form.codice_fiscale || ""} onChange={e => update("codice_fiscale", e.target.value)} style={{ ...fieldCi, fontFamily: "'DM Mono',monospace" }} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div><label style={labelSt}>Rappresentante</label><input value={form.rappresentante || ""} onChange={e => update("rappresentante", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div><label style={labelSt}>Telefono</label><input value={form.telefono || ""} onChange={e => update("telefono", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div><label style={labelSt}>Email</label><input value={form.email || ""} onChange={e => update("email", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div><label style={labelSt}>Sede Legale</label><input value={form.sede_legale || ""} onChange={e => update("sede_legale", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
+              <div style={{ gridColumn: "span 3" }}><label style={labelSt}>Via / Sede Operativa</label><input value={form.via_sede_legale || ""} onChange={e => update("via_sede_legale", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
             </div>
           </SectionCard>
 
@@ -884,8 +941,8 @@ export const PadroncinoDetail = ({
                     }
                   }} 
                   style={fieldCi} 
-                  onFocus={e => e.target.style.borderColor = "#3b82f6"} 
-                  onBlur={e => e.target.style.borderColor = "#e2e8f0"} 
+                  onFocus={e => e.target.style.borderColor = C.primaryMid} 
+                  onBlur={e => e.target.style.borderColor = C.border} 
                 />
               </div>
               <div>
@@ -895,7 +952,7 @@ export const PadroncinoDetail = ({
                   {["PRESENTE", "ASSENTE", "IN AGGIORNAMENTO"].map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
-              <div><label style={labelSt}>Scad. DVR</label><input type="date" value={form.dvr_scadenza || ""} onChange={e => update("dvr_scadenza", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} /></div>
+              <div><label style={labelSt}>Scad. DVR</label><input type="date" value={form.dvr_scadenza || ""} onChange={e => update("dvr_scadenza", e.target.value)} style={fieldCi} onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} /></div>
             </div>
           </SectionCard>
 
@@ -911,7 +968,7 @@ export const PadroncinoDetail = ({
           <SectionCard title="Note" icon="note" accent="#64748b">
             <textarea value={form.note_varie || ""} onChange={e => update("note_varie", e.target.value)} rows={4}
               placeholder="Note generali..." style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-              onFocus={e => e.target.style.borderColor = "#3b82f6"} onBlur={e => e.target.style.borderColor = "#e2e8f0"} />
+              onFocus={e => e.target.style.borderColor = C.primaryMid} onBlur={e => e.target.style.borderColor = C.border} />
           </SectionCard>
         </div>
       )}
@@ -1035,7 +1092,7 @@ export const PadroncinoDetail = ({
               </thead>
               <tbody>
                 {[...padConteggi].sort((a, b) => b.anno - a.anno || b.mese - a.mese).map((c, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                  <tr key={i} style={{ background: i % 2 === 0 ? C.white : C.bgRowAlt }}>
                     <TD><span style={{ fontWeight: 700 }}>{MESI?.[c.mese - 1] || c.mese} {c.anno}</span></TD>
                     <TD><span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: "#166534" }}>{euro(c.totale_fattura || 0)}</span></TD>
                     <TD><span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: "#1d4ed8" }}>{euro(c.totale_da_bonificare || 0)}</span></TD>

@@ -362,9 +362,6 @@ const AppInner = () => {
       data_inizio:     "",
       data_fine:       "",
       contratto:       "",
-      numero_badge:    "",
-      patente:         "",
-      scad_patente:    "",
     };
     handleSaveCodAutista(a, []);
   };

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Icon } from "./Icons";
 import { SectionCard, Input } from "./BaseComponents";
 import { euro, IVA_RATE, PALMARE_TARIFFA_GG, BOLLO_SOGLIA, BOLLO_IMPORTO, calcAddebitiDettaglio } from "../utils/formatters";
+import { generaConteggioPDF } from "./generaConteggioPDF";
 
 // ─── IVA SELECTOR ─────────────────────────────────────────────────────────────
 const IvaSelect = ({ value, onChange }) => (
@@ -17,20 +18,28 @@ const withIva = (imp, rate) => parseFloat(((imp||0) * (1 + (rate??0.22))).toFixe
 
 // ─── CASSA PRIMA NOTA ROW ─────────────────────────────────────────────────────
 const CassaRow = ({ item, onChange, onRemove }) => {
-  const is = { padding:"6px 10px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,background:"#fff" };
+  const is = { padding:"5px 8px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,background:"#fff" };
   return (
-    <div style={{ display:"flex",gap:6,alignItems:"center" }}>
-      <span style={{ fontSize:11,color:"#94a3b8",whiteSpace:"nowrap",flexShrink:0 }}>Acc. n.v. COD</span>
-      <input value={item.cod||""} onChange={e=>onChange({...item,cod:e.target.value})} placeholder="5034"
-        style={{...is,width:60,textAlign:"center",fontFamily:"'DM Mono',monospace"}} />
-      <span style={{ fontSize:11,color:"#94a3b8",whiteSpace:"nowrap",flexShrink:0 }}>del</span>
-      <input type="date" value={item.data||""} onChange={e=>onChange({...item,data:e.target.value})} style={{...is,width:130}} />
-      <input type="number" value={item.importo||0} step="0.01" onChange={e=>onChange({...item,importo:parseFloat(e.target.value)||0})}
-        style={{...is,width:80,fontFamily:"'DM Mono',monospace",textAlign:"right"}} />
-      <span style={{ fontSize:11,color:"#94a3b8" }}>€</span>
-      <button onClick={onRemove} style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"5px 7px",cursor:"pointer",flexShrink:0 }}>
-        <Icon name="x" size={11}/>
-      </button>
+    <div style={{ display:"flex",flexDirection:"column",gap:4,padding:"6px",borderRadius:7,border:"1px solid #f1f5f9",background:"#fafafa" }}>
+      <div style={{ display:"flex",gap:6,alignItems:"center" }}>
+        <span style={{ fontSize:11,color:"#94a3b8",whiteSpace:"nowrap",flexShrink:0 }}>Acc. n.v. COD</span>
+        <input value={item.cod||""} onChange={e=>onChange({...item,cod:e.target.value})} placeholder="5034"
+          style={{...is,width:60,textAlign:"center",fontFamily:"'DM Mono',monospace"}} />
+        <span style={{ fontSize:11,color:"#94a3b8",whiteSpace:"nowrap",flexShrink:0 }}>del</span>
+        <input type="date" value={item.data||""} onChange={e=>onChange({...item,data:e.target.value})} style={{...is,width:130}} />
+        <input type="number" value={item.importo||0} step="0.01" onChange={e=>onChange({...item,importo:parseFloat(e.target.value)||0})}
+          style={{...is,width:80,fontFamily:"'DM Mono',monospace",textAlign:"right"}} />
+        <span style={{ fontSize:11,color:"#94a3b8" }}>€</span>
+        <button onClick={onRemove} style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:5,padding:"4px 6px",cursor:"pointer",flexShrink:0 }}>
+          <Icon name="x" size={10}/>
+        </button>
+      </div>
+      <input
+        value={item.note||""}
+        onChange={e=>onChange({...item,note:e.target.value})}
+        placeholder="Note (facoltativo)..."
+        style={{ ...is,width:"100%",boxSizing:"border-box",color:"#64748b",background:"#fff" }}
+      />
     </div>
   );
 };
@@ -54,26 +63,41 @@ export const cassaToDesc = (item) => {
 };
 
 // ─── ROW IMPORTO (usata nel riepilogo) ────────────────────────────────────────
-const RigaVoce = ({ label, value, nota, color="#374151", bg, accent, indent=false, bold=false, prefix="" }) => (
-  <div style={{ display:"flex",flexDirection:"column",padding:`${indent?"3px 4px 3px 12px":"4px 6px"}`,borderRadius:6,background:bg||"transparent",borderLeft:indent?`2px solid ${accent||"#e2e8f0"}`:"none",gap:1 }}>
+// Volutamente monocromatica: solo intestazioni di sezione colorate, non le righe
+const RigaVoce = ({ label, value, nota, color, bg, accent, indent=false, bold=false, prefix="" }) => (
+  <div style={{ display:"flex",flexDirection:"column",padding:indent?"3px 4px 3px 18px":"4px 10px",gap:1,borderBottom:"1px solid #f8fafc" }}>
     <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:8 }}>
-      <span style={{ fontSize:12,color,fontWeight:bold?700:500,lineHeight:1.3 }}>{label}</span>
-      <span style={{ fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:bold?800:600,color,whiteSpace:"nowrap" }}>{prefix}{euro(value)}</span>
+      <span style={{ fontSize:11.5,color:"#374151",fontWeight:bold?700:400,lineHeight:1.4 }}>{label}</span>
+      <span style={{ fontFamily:"'DM Mono',monospace",fontSize:11.5,fontWeight:bold?800:600,color:"#0f172a",whiteSpace:"nowrap" }}>{prefix}{euro(value)}</span>
     </div>
-    {nota && <div style={{ fontSize:10,color:"#94a3b8",fontStyle:"italic",lineHeight:1.3 }}>{nota}</div>}
+    {nota && <div style={{ fontSize:9.5,color:"#94a3b8",fontStyle:"italic",lineHeight:1.3 }}>{nota}</div>}
   </div>
 );
 
-// ─── SEZIONE HEADER nel riepilogo ─────────────────────────────────────────────
+// ─── SUBLABEL (sotto-intestazione dentro una sezione) ──────────────────────────
+const SubLabel = ({ children }) => (
+  <div style={{ fontSize:9.5,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.07em",padding:"7px 10px 3px",borderTop:"1px solid #f1f5f9",marginTop:2 }}>
+    {children}
+  </div>
+);
+
+// ─── SEZIONE RIEPILOGO — header colorato, righe monocromatiche, totale in fondo
 const RiepilogoSezione = ({ titolo, totale, colore, borderColor, bgHeader, children, emoji }) => (
-  <div style={{ background:"#fff",borderRadius:12,border:`1px solid ${borderColor}`,overflow:"hidden" }}>
+  <div style={{ background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }}>
+    {/* Header: unico elemento colorato */}
     <div style={{ background:bgHeader,padding:"9px 16px",borderBottom:`1px solid ${borderColor}`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
       <div style={{ fontSize:11,fontWeight:800,color:colore,textTransform:"uppercase",letterSpacing:"0.07em",display:"flex",alignItems:"center",gap:6 }}>
-        <span style={{ fontSize:14 }}>{emoji}</span> {titolo}
+        <span style={{ fontSize:13 }}>{emoji}</span>{titolo}
       </div>
-      <div style={{ fontFamily:"'DM Mono',monospace",fontSize:15,fontWeight:800,color:colore }}>{totale}</div>
+      <div style={{ fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:800,color:colore }}>{totale}</div>
     </div>
-    <div style={{ padding:"10px 14px",display:"flex",flexDirection:"column",gap:2 }}>{children}</div>
+    {/* Contenuto: clean, nessun colore */}
+    <div style={{ display:"flex",flexDirection:"column" }}>{children}</div>
+    {/* Totale in fondo: riga sobria con bordo superiore */}
+    <div style={{ padding:"7px 16px",borderTop:`1.5px solid ${borderColor}`,background:"#fafafa",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+      <span style={{ fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em" }}>Totale {titolo}</span>
+      <span style={{ fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:800,color:colore }}>{totale}</span>
+    </div>
   </div>
 );
 
@@ -139,6 +163,137 @@ const TabellaVoci = ({ voci, onChange, colImporto="Importo €", accentColor="#3
   );
 };
 
+// ─── FATTURE FINE MESE — Quick-add con numero/data + tabella ────────────────
+// Inserisci solo numero (es. 0510) + data → genera automaticamente la descrizione completa
+const FattureFMSection = ({ form, set }) => {
+  const [qNum,  setQNum]  = useState("");   // es. "0510"
+  const [qData, setQData] = useState("");   // es. "2026-02-28" (ISO)
+  const [qImp,  setQImp]  = useState("");   // es. "1250.00"
+
+  const fmtDataIT = (iso) => {
+    if (!iso) return "";
+    const [y,m,d] = iso.split("-");
+    return `${d}/${m}/${y}`;
+  };
+
+  const aggiungiRapida = () => {
+    if (!qNum.trim()) return;
+    const desc = `FATTURA FINE MESE ${qNum.trim()}/FM${qData ? ` Del ${fmtDataIT(qData)}` : ""}`;
+    set("fatture_fine_mese", [
+      ...(form.fatture_fine_mese||[]),
+      { descrizione: desc, importo: parseFloat(qImp)||0, note: "" },
+    ]);
+    setQNum(""); setQData(""); setQImp("");
+  };
+
+  const is = { padding:"5px 7px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,background:"#fff",boxSizing:"border-box" };
+
+  return (
+    <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+
+      {/* Quick-add FM */}
+      <div style={{ padding:"10px 12px",background:"#f0fdf4",borderRadius:8,border:"1px solid #bbf7d0" }}>
+        <div style={{ fontSize:9,fontWeight:800,color:"#166534",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:7 }}>
+          ⚡ Inserimento rapido Fattura Fine Mese
+        </div>
+        <div style={{ display:"grid",gridTemplateColumns:"90px 130px 90px auto",gap:6,alignItems:"center" }}>
+          <div>
+            <div style={{ fontSize:9,color:"#64748b",fontWeight:700,marginBottom:2,textTransform:"uppercase" }}>N° fattura</div>
+            <input
+              value={qNum}
+              onChange={e => setQNum(e.target.value)}
+              placeholder="0510"
+              style={{ ...is,fontFamily:"'DM Mono',monospace",fontWeight:700,width:"100%" }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize:9,color:"#64748b",fontWeight:700,marginBottom:2,textTransform:"uppercase" }}>Data</div>
+            <input
+              type="date"
+              value={qData}
+              onChange={e => setQData(e.target.value)}
+              style={{ ...is,width:"100%" }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize:9,color:"#64748b",fontWeight:700,marginBottom:2,textTransform:"uppercase" }}>Importo €</div>
+            <input
+              type="number" step="0.01"
+              value={qImp}
+              onChange={e => setQImp(e.target.value)}
+              placeholder="0,00"
+              style={{ ...is,fontFamily:"'DM Mono',monospace",width:"100%" }}
+            />
+          </div>
+          <div style={{ paddingTop:15 }}>
+            <button
+              onClick={aggiungiRapida}
+              disabled={!qNum.trim()}
+              style={{
+                padding:"6px 12px",borderRadius:6,fontSize:11,fontWeight:700,cursor:"pointer",
+                background: qNum.trim() ? "#16a34a" : "#e2e8f0",
+                color: qNum.trim() ? "#fff" : "#94a3b8",
+                border:"none",whiteSpace:"nowrap",
+              }}
+            >
+              + Aggiungi
+            </button>
+          </div>
+        </div>
+        {qNum.trim() && (
+          <div style={{ marginTop:6,fontSize:10,color:"#166534",fontStyle:"italic",fontWeight:600 }}>
+            Anteprima: FATTURA FINE MESE {qNum.trim()}/FM{qData ? ` Del ${fmtDataIT(qData)}` : ""}
+          </div>
+        )}
+      </div>
+
+      {/* Tabella righe */}
+      {(form.fatture_fine_mese||[]).length > 0 && (
+        <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #e2e8f0" }}>
+          <table style={{ width:"100%",borderCollapse:"collapse" }}>
+            <colgroup><col/><col style={{ width:95 }}/><col/><col style={{ width:28 }}/></colgroup>
+            <thead>
+              <tr style={{ background:"#f8fafc" }}>
+                {["Descrizione / Rif. Fattura","Importo €","Note",""].map(h=>(
+                  <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(form.fatture_fine_mese||[]).map((item,i)=>(
+                <tr key={i} style={{ background:i%2===0?"#fff":"#fafafa" }}>
+                  <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                    <input value={item.descrizione||""} onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],descrizione:e.target.value};set("fatture_fine_mese",a);}}
+                      placeholder="FATTURA FINE MESE …" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
+                  </td>
+                  <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                    <input type="number" value={item.importo||0} step="0.01" onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("fatture_fine_mese",a);}}
+                      style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",boxSizing:"border-box" }} />
+                  </td>
+                  <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
+                    <input value={item.note||""} onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],note:e.target.value};set("fatture_fine_mese",a);}}
+                      placeholder="Note..." style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,color:"#64748b",boxSizing:"border-box" }} />
+                  </td>
+                  <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
+                    <button onClick={()=>set("fatture_fine_mese",(form.fatture_fine_mese||[]).filter((_,j)=>j!==i))}
+                      style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Aggiungi libera */}
+      <button onClick={()=>set("fatture_fine_mese",[...(form.fatture_fine_mese||[]),{descrizione:"",importo:0,note:""}])}
+        style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer",alignSelf:"flex-start" }}>
+        <Icon name="plus" size={13}/> Aggiungi riga libera
+      </button>
+    </div>
+  );
+};
+
 // ─── CONTEGGI FORM ────────────────────────────────────────────────────────────
 export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, onSave, onSaveTemplate, embedded, addebiti_standard=[], ricaricheMese={}, mezziFlotta=[] }) => {
   const [tab, setTab] = useState("riepilogo");
@@ -161,6 +316,41 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
     prevMezzi.current = curr;
     const tot = (form.dettagli_mezzi||[]).reduce((s,m)=>s+(m.importo||0),0);
     set("addebiti_mezzi", parseFloat(tot.toFixed(2)));
+  });
+
+  // Elenco mezzi del padroncino: normalizza i campi sia da mezziFlotta che da embedded
+  const normMezzo = (m) => ({
+    ...m,
+    rata_noleggio: m.rata_noleggio || m.tariffa_mensile || 0,
+    alimentazione: m.alimentazione || m.tipologia || "",
+  });
+  const tuttiMezziDisp = (() => {
+    const flotta   = (mezziFlotta || []).map(normMezzo);
+    const embedded = (padroncino?.mezzi || [])
+      .filter(m => m.targa)
+      .map(normMezzo);
+    if (flotta.length > 0) {
+      const targheFlotta = new Set(flotta.map(f => (f.targa||"").toUpperCase()));
+      const extra = embedded.filter(m => !targheFlotta.has((m.targa||"").toUpperCase()));
+      return [...flotta, ...extra];
+    }
+    return embedded;
+  })();
+
+  // Backfill tipologia (alimentazione) per righe con targa ma tipologia vuota
+  const prevTipologia = useRef("");
+  useEffect(() => {
+    const key = (form.dettagli_mezzi||[]).map(m => m.targa + "|" + m.tipologia).join(",");
+    if (key === prevTipologia.current) return;
+    prevTipologia.current = key;
+    const righe = form.dettagli_mezzi || [];
+    if (!righe.some(m => m.targa && !m.tipologia)) return;
+    const updated = righe.map(m => {
+      if (!m.targa || m.tipologia) return m;
+      const found = tuttiMezziDisp.find(f => (f.targa||"").toUpperCase() === (m.targa||"").toUpperCase());
+      return found?.alimentazione ? { ...m, tipologia: found.alimentazione } : m;
+    });
+    set("dettagli_mezzi", updated);
   });
 
   // Auto-sincronizza n_palmari dall'anagrafica padroncino
@@ -288,10 +478,26 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
       {/* ── TABS ── */}
-      <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+      <div style={{ display:"flex",gap:8,flexWrap:"wrap",alignItems:"center" }}>
         {[["riepilogo","📊 Riepilogo"],["fatturato","Fatturato"],["addebiti","Addebiti"],["compensazioni","Compensazioni"]].map(([t,l]) => (
           <button key={t} onClick={() => setTab(t)} style={tabStyle(t)}>{l}</button>
         ))}
+
+        {/* Bottone esporta PDF — visibile sempre */}
+        <button
+          onClick={() => generaConteggioPDF({ form, padroncino, mese, anno, giorni })}
+          title="Scarica riepilogo PDF"
+          style={{
+            marginLeft: "auto",
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "7px 14px", borderRadius: 8,
+            background: "#dc2626", color: "#fff",
+            border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Icon name="file" size={13} /> Esporta PDF
+        </button>
       </div>
 
       {/* ══ FATTURATO ══ */}
@@ -478,16 +684,64 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
           {/* Mezzi */}
           <SectionCard title="Mezzi in Noleggio" icon="truck" accent="#ef4444">
             <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+
+              {/* ── CHIP PICKER: sempre visibile se esistono mezzi del padroncino ── */}
+              {tuttiMezziDisp.length > 0 && (() => {
+                const targheGia = new Set((form.dettagli_mezzi||[]).map(m=>(m.targa||"").toUpperCase()));
+                const candidati = tuttiMezziDisp.filter(f => f.targa && !targheGia.has((f.targa||"").toUpperCase()));
+                if (candidati.length === 0) return (
+                  <div style={{ fontSize:11,color:"#64748b",padding:"7px 10px",background:"#f8fafc",borderRadius:7,border:"1px solid #e2e8f0" }}>
+                    ✅ Tutti i mezzi del padroncino sono già stati aggiunti.
+                  </div>
+                );
+                return (
+                  <div style={{ padding:"10px 12px",background:"#f0f9ff",borderRadius:8,border:"1px solid #bae6fd" }}>
+                    <div style={{ fontSize:9,fontWeight:800,color:"#0369a1",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:7 }}>
+                      🚛 Mezzi del padroncino — clicca per aggiungere
+                    </div>
+                    <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
+                      {candidati.map(f => {
+                        const imp     = f.rata_noleggio || 0;
+                        const isElett = (f.alimentazione||"").toLowerCase().includes("elettr");
+                        return (
+                          <button
+                            key={f.id||f.targa}
+                            onClick={() => set("dettagli_mezzi", [...(form.dettagli_mezzi||[]), {
+                              targa:         (f.targa||"").toUpperCase(),
+                              tipologia:     f.alimentazione || "",
+                              importo:       imp,
+                              importo_ivato: parseFloat((imp * 1.22).toFixed(2)),
+                              nota:          "",
+                            }])}
+                            style={{ display:"flex",gap:5,alignItems:"center",padding:"5px 11px",borderRadius:6,background:"#fff",border:"1px solid #bae6fd",color:"#0369a1",fontSize:11,fontWeight:700,cursor:"pointer" }}
+                            onMouseEnter={e => e.currentTarget.style.background="#e0f2fe"}
+                            onMouseLeave={e => e.currentTarget.style.background="#fff"}
+                          >
+                            <span style={{ fontFamily:"'DM Mono',monospace",fontWeight:800 }}>{(f.targa||"").toUpperCase()}</span>
+                            {f.alimentazione && (
+                              <span style={{ fontSize:9,padding:"1px 5px",borderRadius:4,background:isElett?"#bfdbfe":"#f1f5f9",color:isElett?"#1d4ed8":"#64748b",fontWeight:600 }}>
+                                {isElett?"⚡ ":""}{f.alimentazione}
+                              </span>
+                            )}
+                            {imp > 0 && (
+                              <span style={{ fontSize:10,fontFamily:"'DM Mono',monospace",color:"#166534",fontWeight:700 }}>€{imp}</span>
+                            )}
+                            <span style={{ color:"#93c5fd",fontSize:15,lineHeight:1 }}>+</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── Tabella righe inserite ── */}
               {(form.dettagli_mezzi||[]).length > 0 && (
                 <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #f1f5f9" }}>
                   <table style={{ width:"100%",borderCollapse:"collapse",tableLayout:"fixed" }}>
                     <colgroup>
-                      <col style={{ width:90 }} />
-                      <col style={{ width:90 }} />
-                      <col style={{ width:100 }} />
-                      <col />
-                      <col style={{ width:90 }} />
-                      <col style={{ width:28 }} />
+                      <col style={{ width:90 }} /><col style={{ width:90 }} /><col style={{ width:100 }} />
+                      <col /><col style={{ width:90 }} /><col style={{ width:28 }} />
                     </colgroup>
                     <thead>
                       <tr style={{ background:"#f8fafc" }}>
@@ -500,8 +754,23 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
                       {(form.dettagli_mezzi||[]).map((m,i)=>(
                         <tr key={i} style={{ background:i%2===0?"#fff":"#fafafa" }}>
                           <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
-                            <input value={m.targa} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],targa:e.target.value};set("dettagli_mezzi",a);}}
-                              placeholder="Targa" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:700,boxSizing:"border-box" }} />
+                            <input
+                              value={m.targa}
+                              onChange={e => {
+                                const tg = e.target.value.toUpperCase();
+                                const a  = [...form.dettagli_mezzi];
+                                const found = tuttiMezziDisp.find(f => (f.targa||"").toUpperCase() === tg);
+                                a[i] = {
+                                  ...a[i], targa: tg,
+                                  tipologia:     a[i].tipologia     || (found?.alimentazione || ""),
+                                  importo:       a[i].importo       || (found?.rata_noleggio || 0),
+                                  importo_ivato: a[i].importo_ivato || parseFloat(((found?.rata_noleggio||0)*1.22).toFixed(2)),
+                                };
+                                set("dettagli_mezzi", a);
+                              }}
+                              placeholder="Targa"
+                              style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:700,boxSizing:"border-box",textTransform:"uppercase" }}
+                            />
                           </td>
                           <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
                             <input type="number" value={m.importo} onChange={e=>{const a=[...form.dettagli_mezzi];a[i]={...a[i],importo:parseFloat(e.target.value)||0,importo_ivato:parseFloat(((parseFloat(e.target.value)||0)*1.22).toFixed(2))};set("dettagli_mezzi",a);}}
@@ -532,16 +801,12 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
               )}
               <button onClick={()=>set("dettagli_mezzi",[...(form.dettagli_mezzi||[]),{targa:"",importo:0,importo_ivato:0,tipologia:"",nota:""}])}
                 style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer",alignSelf:"flex-start" }}>
-                <Icon name="plus" size={13}/> Aggiungi mezzo
+                <Icon name="plus" size={13}/> Aggiungi manuale
               </button>
               {(form.dettagli_mezzi||[]).length > 0 && (
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 10px",background:"#fee2e2",borderRadius:8,fontSize:12,marginTop:2 }}>
-                  <span style={{ fontWeight:700,color:"#dc2626" }}>
-                    Totale {(form.dettagli_mezzi||[]).length} mezzi (imponibile)
-                  </span>
-                  <span style={{ fontFamily:"'DM Mono',monospace",fontWeight:800,color:"#dc2626" }}>
-                    {euro(form.addebiti_mezzi||0)}
-                  </span>
+                  <span style={{ fontWeight:700,color:"#dc2626" }}>Totale {(form.dettagli_mezzi||[]).length} mezzi (imponibile)</span>
+                  <span style={{ fontFamily:"'DM Mono',monospace",fontWeight:800,color:"#dc2626" }}>{euro(form.addebiti_mezzi||0)}</span>
                 </div>
               )}
             </div>
@@ -584,28 +849,37 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
                 </div>
               )}
               {(form.ricariche_mezzi||[]).length>0 && (
-                <div style={{ display:"grid",gridTemplateColumns:"80px 1fr 80px 88px 28px",gap:6,fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase" }}>
+                <div style={{ display:"grid",gridTemplateColumns:"80px 1fr 80px 88px 28px",gap:6,fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",padding:"0 4px" }}>
                   <span>Targa</span><span>Note</span><span>Importo</span><span>IVA</span><span/>
                 </div>
               )}
               {(form.ricariche_mezzi||[]).length===0 && <div style={{ color:"#94a3b8",fontSize:12,textAlign:"center",padding:"10px 0" }}>Nessuna ricarica</div>}
               {(form.ricariche_mezzi||[]).map((r,i) => {
                 const rate = r.iva_rate??0.22;
+                const upd = (patch) => { const a=[...(form.ricariche_mezzi||[])]; a[i]={...a[i],...patch}; set("ricariche_mezzi",a); };
                 return (
-                  <div key={i} style={{ display:"flex",flexDirection:"column",gap:3 }}>
+                  <div key={i} style={{ display:"flex",flexDirection:"column",gap:3,padding:"6px 4px",borderRadius:7,background:i%2===0?"#fff":"#fafafa",border:"1px solid #f1f5f9" }}>
+                    {/* Riga principale: targa | note | importo | iva | × */}
                     <div style={{ display:"grid",gridTemplateColumns:"80px 1fr 80px 88px 28px",gap:6,alignItems:"center" }}>
-                      <input value={r.targa||""} onChange={e=>{const a=[...(form.ricariche_mezzi||[])];a[i]={...a[i],targa:e.target.value};set("ricariche_mezzi",a);}}
-                        placeholder="Targa" style={{ padding:"6px 8px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,fontFamily:"'DM Mono',monospace" }} />
-                      <input value={r.descrizione||""} onChange={e=>{const a=[...(form.ricariche_mezzi||[])];a[i]={...a[i],descrizione:e.target.value};set("ricariche_mezzi",a);}}
-                        placeholder="Note" style={{ padding:"6px 8px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12 }} />
-                      <input type="number" value={r.importo||0} step="0.01" onChange={e=>{const a=[...(form.ricariche_mezzi||[])];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("ricariche_mezzi",a);}}
-                        style={{ padding:"6px 8px",borderRadius:7,border:"1px solid #e2e8f0",fontSize:12,fontFamily:"'DM Mono',monospace",textAlign:"right" }} />
-                      <IvaSelect value={rate} onChange={v=>{const a=[...(form.ricariche_mezzi||[])];a[i]={...a[i],iva_rate:v};set("ricariche_mezzi",a);}} />
+                      <input value={r.targa||""} onChange={e=>upd({targa:e.target.value})}
+                        placeholder="Targa" style={{ padding:"5px 7px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:700 }} />
+                      <input value={r.note||""} onChange={e=>upd({note:e.target.value})}
+                        placeholder="Note..." style={{ padding:"5px 7px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,color:"#475569" }} />
+                      <input type="number" value={r.importo||0} step="0.01" onChange={e=>upd({importo:parseFloat(e.target.value)||0})}
+                        style={{ padding:"5px 7px",borderRadius:6,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",textAlign:"right" }} />
+                      <IvaSelect value={rate} onChange={v=>upd({iva_rate:v})} />
                       <button onClick={() => set("ricariche_mezzi",(form.ricariche_mezzi||[]).filter((_,j)=>j!==i))}
-                        style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:6,padding:"5px 6px",cursor:"pointer" }}>
-                        <Icon name="x" size={11}/>
+                        style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:5,padding:"4px 5px",cursor:"pointer" }}>
+                        <Icon name="x" size={10}/>
                       </button>
                     </div>
+                    {/* Descrizione auto (readonly, grigio piccolo) */}
+                    {r.descrizione && (
+                      <div style={{ fontSize:9.5,color:"#94a3b8",fontStyle:"italic",paddingLeft:4,lineHeight:1.4 }}>
+                        ℹ️ {r.descrizione}
+                      </div>
+                    )}
+                    {/* Totale con IVA */}
                     {rate>0 && r.importo>0 && (
                       <div style={{ fontSize:10,color:"#0c4a6e",paddingLeft:4 }}>
                         Con IVA {Math.round(rate*100)}%: <strong style={{ fontFamily:"'DM Mono',monospace" }}>{euro(withIva(r.importo,rate))}</strong>
@@ -614,7 +888,7 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
                   </div>
                 );
               })}
-              <button onClick={() => set("ricariche_mezzi",[...(form.ricariche_mezzi||[]),{targa:"",descrizione:"",importo:0,iva_rate:0.22}])}
+              <button onClick={() => set("ricariche_mezzi",[...(form.ricariche_mezzi||[]),{targa:"",descrizione:"",note:"",importo:0,iva_rate:0.22}])}
                 style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
                 <Icon name="plus" size={13}/> Aggiungi ricarica
               </button>
@@ -750,44 +1024,7 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
           </SectionCard>
 
           <SectionCard title="Fatture Fine Mese / Altre" icon="note" accent="#10b981">
-            <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-              {(form.fatture_fine_mese||[]).length > 0 && (
-                <div style={{ overflowX:"auto",borderRadius:8,border:"1px solid #e2e8f0" }}>
-                  <table style={{ width:"100%",borderCollapse:"collapse" }}>
-                    <colgroup><col/><col style={{ width:100 }}/><col style={{ width:28 }}/></colgroup>
-                    <thead>
-                      <tr style={{ background:"#f8fafc" }}>
-                        {["Descrizione / Rif. Fattura","Importo €",""].map(h=>(
-                          <th key={h} style={{ padding:"5px 7px",textAlign:"left",fontSize:9,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",borderBottom:"1px solid #e2e8f0" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(form.fatture_fine_mese||[]).map((item,i)=>(
-                        <tr key={i} style={{ background:i%2===0?"#fff":"#fafafa" }}>
-                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
-                            <input value={item.descrizione} onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],descrizione:e.target.value};set("fatture_fine_mese",a);}}
-                              placeholder="Es. FATTURA FINE MESE 0127/FM" style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,boxSizing:"border-box" }} />
-                          </td>
-                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9" }}>
-                            <input type="number" value={item.importo} step="0.01" onChange={e=>{const a=[...form.fatture_fine_mese];a[i]={...a[i],importo:parseFloat(e.target.value)||0};set("fatture_fine_mese",a);}}
-                              style={{ width:"100%",padding:"3px 6px",borderRadius:5,border:"1px solid #e2e8f0",fontSize:11,fontFamily:"'DM Mono',monospace",boxSizing:"border-box" }} />
-                          </td>
-                          <td style={{ padding:"4px 5px",borderBottom:"1px solid #f1f5f9",textAlign:"center" }}>
-                            <button onClick={()=>set("fatture_fine_mese",form.fatture_fine_mese.filter((_,j)=>j!==i))}
-                              style={{ background:"#fee2e2",color:"#dc2626",border:"none",borderRadius:4,padding:"3px 5px",cursor:"pointer",lineHeight:1 }}>×</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <button onClick={()=>set("fatture_fine_mese",[...(form.fatture_fine_mese||[]),{descrizione:"",importo:0}])}
-                style={{ display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:7,background:"#f8fafc",border:"1px dashed #cbd5e1",color:"#475569",fontSize:12,cursor:"pointer" }}>
-                <Icon name="plus" size={13}/> Aggiungi fattura
-              </button>
-            </div>
+            <FattureFMSection form={form} set={set} />
           </SectionCard>
 
           <SectionCard title="Cassa Prima Nota / Acconti non Versati" icon="euro" accent="#f59e0b">
@@ -889,7 +1126,7 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
             >
               {(form.addebiti_palmari||0)>0 && (
                 <>
-                  <div style={{ fontSize:10,fontWeight:800,color:"#92400e",textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 2px 2px" }}>Noleggio Palmari</div>
+                  <SubLabel>📱 Noleggio Palmari</SubLabel>
                   {(form.voci_palmari||[]).length > 0
                     ? (form.voci_palmari||[]).filter(v=>(v.importo||0)!==0).map((v,i)=>(
                         <RigaVoce
@@ -911,11 +1148,11 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
               )}
               {(form.dettagli_mezzi||[]).filter(m=>(m.importo||0)>0).length>0 && (
                 <>
-                  <div style={{ fontSize:10,fontWeight:800,color:"#dc2626",textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 2px 2px" }}>Mezzi in Noleggio</div>
+                  <SubLabel>🚛 Mezzi in Noleggio</SubLabel>
                   {(form.dettagli_mezzi||[]).filter(m=>(m.importo||0)>0).map((m,i)=>(
                     <RigaVoce
                       key={i}
-                      label={`🚛 Noleggio ${m.targa}${m.tipologia?` (${m.tipologia})`:""} (+IVA 22%)`}
+                      label={`Noleggio ${m.targa}${m.tipologia?` (${m.tipologia})`:""} (+IVA 22%)`}
                       value={m.importo_ivato||(m.importo||0)*1.22}
                       nota={m.nota}
                       color="#dc2626" bg="#fff1f2" accent="#fca5a5" indent bold
@@ -925,13 +1162,13 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
               )}
               {(form.ricariche_mezzi||[]).filter(r=>(r.importo||0)>0).length>0 && (
                 <>
-                  <div style={{ fontSize:10,fontWeight:800,color:"#0c4a6e",textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 2px 2px" }}>Ricariche Elettriche</div>
+                  <SubLabel>⚡ Ricariche Elettriche</SubLabel>
                   {(form.ricariche_mezzi||[]).filter(r=>(r.importo||0)>0).map((r,i)=>{
                     const rate=r.iva_rate??0.22;
                     return (
                       <RigaVoce
                         key={i}
-                        label={`⚡ Ricarica ${r.targa}${r.descrizione?` — ${r.descrizione}`:""}`}
+                        label={`⚡ Ricarica ${r.targa}${r.note?` — ${r.note}`:(r.descrizione?` — ${r.descrizione}`:"")}`}
                         value={parseFloat(((r.importo||0)*(1+rate)).toFixed(2))}
                         color="#0c4a6e" bg="#e0f2fe" accent="#7dd3fc" indent bold
                       />
@@ -941,7 +1178,7 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
               )}
               {((form.altri_addebiti||[]).filter(a=>(a.importo||0)>0).length>0||addebitiDet.bollo>0) && (
                 <>
-                  <div style={{ fontSize:10,fontWeight:800,color:"#5b21b6",textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 2px 2px" }}>Altri Addebiti</div>
+                  <SubLabel>📋 Altri Addebiti</SubLabel>
                   {(form.altri_addebiti||[]).filter(a=>(a.importo||0)>0).map((a,i)=>{
                     const rate=a.iva_rate??0.22;
                     return (
@@ -984,19 +1221,19 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
                   )}
                   {(form.fatture_fine_mese||[]).filter(f=>(f.importo||0)>0).length>0 && (
                     <>
-                      <div style={{ fontSize:10,fontWeight:800,color:"#166534",textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 2px 2px" }}>Fatture Fine Mese / Altre</div>
+                      <SubLabel>📄 Fatture Fine Mese / Altre</SubLabel>
                       {(form.fatture_fine_mese||[]).filter(f=>(f.importo||0)>0).map((f,i)=>(
-                        <RigaVoce key={i} label={f.descrizione||"Fattura Fine Mese"} value={f.importo} color="#166534" bg="#f0fdf4" accent="#86efac" indent bold />
+                        <RigaVoce key={i} label={f.descrizione||"Fattura Fine Mese"} value={f.importo} nota={f.note} indent bold />
                       ))}
                     </>
                   )}
                   {cassaNorm.filter(cc=>(cc.importo||0)>0).length>0 && (
                     <>
-                      <div style={{ fontSize:10,fontWeight:800,color:"#854d0e",textTransform:"uppercase",letterSpacing:"0.06em",padding:"4px 2px 2px" }}>Cassa Prima Nota / Acconti</div>
+                      <SubLabel>💰 Cassa Prima Nota / Acconti</SubLabel>
                       {cassaNorm.filter(cc=>(cc.importo||0)>0).map((cc,i)=>(
                         <RigaVoce
                           key={i}
-                          label={`💰 Acconto n.v. COD ${cc.cod||"—"}${cc.data?` del ${cc.data}`:""}`}
+                          label={`Acconto n.v. COD ${cc.cod||"—"}${cc.data?` del ${cc.data}`:""}`}
                           value={-(cc.importo||0)}
                           color="#854d0e" bg="#fefce8" accent="#fde68a" indent bold
                         />

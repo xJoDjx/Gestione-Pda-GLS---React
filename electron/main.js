@@ -232,21 +232,35 @@ function runMigrations() {
 
 
   db.exec(`CREATE TABLE IF NOT EXISTS cod_autisti (
-    id            TEXT PRIMARY KEY,
-    codice        TEXT DEFAULT '',
-    stato         TEXT DEFAULT 'DISPONIBILE',
-    padroncino_id TEXT DEFAULT '',
-    note          TEXT DEFAULT '',
-    storico       TEXT DEFAULT '[]',
-    created_at    TEXT DEFAULT (datetime('now')),
-    updated_at    TEXT DEFAULT (datetime('now'))
+    id             TEXT PRIMARY KEY,
+    codice         TEXT DEFAULT '',
+    stato          TEXT DEFAULT 'DISPONIBILE',
+    padroncino_id  TEXT DEFAULT '',
+    note           TEXT DEFAULT '',
+    storico        TEXT DEFAULT '[]',
+    documenti      TEXT DEFAULT '[]',
+    contratto      TEXT DEFAULT '',
+    data_inizio    TEXT DEFAULT '',
+    data_fine      TEXT DEFAULT '',
+    tariffa_fissa  REAL DEFAULT 0,
+    tariffa_ritiro REAL DEFAULT 0,
+    target         REAL DEFAULT 0,
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now'))
   )`);
   [
-    ["codice",        "TEXT DEFAULT ''"],
-    ["stato",         "TEXT DEFAULT 'DISPONIBILE'"],
-    ["padroncino_id", "TEXT DEFAULT ''"],
-    ["note",          "TEXT DEFAULT ''"],
-    ["storico",       "TEXT DEFAULT '[]'"],
+    ["codice",         "TEXT DEFAULT ''"],
+    ["stato",          "TEXT DEFAULT 'DISPONIBILE'"],
+    ["padroncino_id",  "TEXT DEFAULT ''"],
+    ["note",           "TEXT DEFAULT ''"],
+    ["storico",        "TEXT DEFAULT '[]'"],
+    ["documenti",      "TEXT DEFAULT '[]'"],
+    ["contratto",      "TEXT DEFAULT ''"],
+    ["data_inizio",    "TEXT DEFAULT ''"],
+    ["data_fine",      "TEXT DEFAULT ''"],
+    ["tariffa_fissa",  "REAL DEFAULT 0"],
+    ["tariffa_ritiro", "REAL DEFAULT 0"],
+    ["target",         "REAL DEFAULT 0"],
   ].forEach(([c,d]) => addColumnIfMissing("cod_autisti", c, d));
 
   db.exec(`CREATE TABLE IF NOT EXISTS activity_log (
@@ -294,7 +308,7 @@ const JSON_FIELDS_CONTEGGI = [
 ];
 const JSON_FIELDS_MEZZI    = ["documenti","storico"];
 const JSON_FIELDS_PALMARI  = ["documenti","storico"];
-const JSON_FIELDS_COD_AUTISTI = ["storico"];
+const JSON_FIELDS_COD_AUTISTI = ["storico", "documenti"];
 
 function parseRow(row, jsonFields) {
   if (!row) return null;
