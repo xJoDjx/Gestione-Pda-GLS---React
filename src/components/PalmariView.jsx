@@ -1,14 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PalmariView.jsx  —  refactored con theme.js + sharedUI.jsx
+// PalmariView.jsx  — AGGIORNATO
 //
-// Rimossi dal file originale:
-//   ✅ KpiCard         → da sharedUI
-//   ✅ StoricoTabella  → da sharedUI
-//   ✅ getAzStorico    → da sharedUI
-//   ✅ fmtTs           → da sharedUI
-//   ✅ STILE_AZ        → da theme
-//   ✅ FormInput / FormSelect locali → da sharedUI (stesso nome, stessa API)
-//   ✅ Tutti i colori/spacing hardcoded → da theme
+// Novità rispetto all'originale:
+//   ✅ Ordinamento colonne nella lista (come MezziView)
+//   ✅ Controllo duplicati seriale già esistente
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
@@ -31,9 +26,7 @@ import {
 // ─── COSTANTI ─────────────────────────────────────────────────────────────────
 const MODELLI = ["Zebra TC52","Zebra TC57","Zebra TC72","Zebra TC77","Honeywell CT60","Honeywell EDA51","Datalogic Memor 20","Altro"];
 const STATI   = ["DISPONIBILE","ASSEGNATO","GUASTO","DISMESSO"];
-
-// Colore accent di questa vista (violet)
-const ACCENT = C.violet; // "#6d28d9"
+const ACCENT  = C.violet;
 
 // ─── FILE HELPERS ──────────────────────────────────────────────────────────────
 const _isElectron = typeof window !== "undefined" && !!window.electronAPI;
@@ -93,10 +86,19 @@ const buildStoricoP = (vecchio, nuovo, padroncini = []) => {
 
 
 // ─── DETTAGLIO PALMARE ────────────────────────────────────────────────────────
-const PalmareDetail = ({ palmare, padroncini, onBack, onSave, onDelete, onDuplicate }) => {
-  const [form, setForm] = useState({ ...palmare });
-  const [tab,  setTab]  = useState("info");
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+const PalmareDetail = ({
+  palmare,
+  padroncini,
+  tuttiPalmari,       // ← per controllo duplicati
+  onBack,
+  onSave,
+  onDelete,
+  onDuplicate,
+}) => {
+  const [form, setForm]     = useState({ ...palmare });
+  const [tab,  setTab]      = useState("info");
+  const [errDup, setErrDup] = useState(false);
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrDup(false); };
 
   const storico = form.storico   || [];
   const docs    = form.documenti || [];
@@ -104,8 +106,19 @@ const PalmareDetail = ({ palmare, padroncini, onBack, onSave, onDelete, onDuplic
   const sc      = statoStyle(form.stato);
 
   const handleSave = () => {
+    // ── Controllo duplicati seriale ──────────────────────────────────────────
+    const serialeNorm = (form.seriale || "").trim().toUpperCase();
+    const duplicato = tuttiPalmari.some(p =>
+      p.id !== form.id &&
+      (p.seriale || "").trim().toUpperCase() === serialeNorm &&
+      serialeNorm !== ""
+    );
+    if (duplicato) {
+      setErrDup(true);
+      return;
+    }
+
     const nuoviLog = buildStoricoP(palmare, form, padroncini);
-    // Traccia variazioni documenti nello storico
     const docsOld = (palmare.documenti || []).map(d => d.nome || d.id).filter(Boolean);
     const docsNew = docs.map(d => d.nome || d.id).filter(Boolean);
     const ts   = new Date().toISOString();
@@ -208,7 +221,18 @@ const PalmareDetail = ({ palmare, padroncini, onBack, onSave, onDelete, onDuplic
           </span>
         </div>
 
-        <div style={{ display: "flex", gap: SP.gapSm }}>
+        <div style={{ display: "flex", gap: SP.gapSm, alignItems: "center" }}>
+          {/* Errore duplicato seriale */}
+          {errDup && (
+            <span style={{
+              fontSize: TY.sm, fontWeight: TY.bold, color: C.danger,
+              background: C.dangerBg, padding: "5px 12px",
+              borderRadius: BR.lg, border: `1px solid ${C.dangerBorder}`,
+            }}>
+              ⚠️ Seriale già esistente
+            </span>
+          )}
+
           {onDelete && (
             <button
               onClick={() => { if (window.confirm(`Eliminare palmare ${form.seriale || ""}?`)) onDelete(form.id); }}
@@ -386,11 +410,42 @@ export const PalmariView = ({ palmari = [], padroncini = [], onSave, onDelete, o
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detail,      setDetail]      = useState(null);
 
+  // ── Ordinamento colonne ─────────────────────────────────────────────────────
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState(null);
+
+  const handleSort = (col) => {
+    if (!col) return;
+    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortCol(null); setSortDir(null); }
+  };
+
+  const getSortIcon = (col) => {
+    if (sortCol !== col) return " ↕";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  };
+
+  const thSortStyle = (col) => ({
+    padding:       SP.cellLg,
+    textAlign:     "left",
+    fontSize:      TY.xs,
+    fontWeight:    TY.black,
+    color:         sortCol === col ? ACCENT : C.fgMuted,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    borderBottom:  sortCol === col ? `2px solid ${ACCENT}` : `2px solid ${C.border}`,
+    whiteSpace:    "nowrap",
+    cursor:        col ? "pointer" : "default",
+    userSelect:    "none",
+  });
+
+  // ── Duplica palmare ─────────────────────────────────────────────────────────
   const handleDuplicate = (p) => {
     const copy = {
       ...p,
       id:            `PALM_${Date.now()}`,
-      seriale:       "",
+      seriale:       "",         // obbligatorio compilare
       stato:         "DISPONIBILE",
       padroncino_id: "",
       storico:       [],
@@ -408,6 +463,7 @@ export const PalmariView = ({ palmari = [], padroncini = [], onSave, onDelete, o
       <PalmareDetail
         palmare={fresh}
         padroncini={padroncini}
+        tuttiPalmari={palmari}
         onBack={() => setDetail(null)}
         onSave={(p, nuoviLog) => { if (onSave) onSave(p, nuoviLog); setDetail(null); }}
         onDelete={id => { if (onDelete) onDelete(id); setDetail(null); }}
@@ -416,15 +472,60 @@ export const PalmariView = ({ palmari = [], padroncini = [], onSave, onDelete, o
     );
   }
 
+  // ── Filtra (Ricerca Globale) ────────────────────────────────────────────────
   const filtered = palmari.filter(p => {
     const q = search.toLowerCase();
+    const padNome = padroncini.find(x => x.id === p.padroncino_id)?.nome || "";
+    
+    // Array di tutti i campi su cui cercare
+    const searchFields = [
+      p.seriale,
+      p.modello,
+      p.modello_custom,
+      p.stato,
+      padNome,
+      p.tariffa_mensile,
+      p.data_assegnazione,
+      p.data_fine,
+      p.note
+    ].map(v => String(v ?? "").toLowerCase());
+
     return (
-      (!q || [p.seriale, p.modello, p.modello_custom, p.note].some(v => v?.toLowerCase().includes(q))) &&
+      (!q || searchFields.some(f => f.includes(q))) &&
       (filtroStato === "TUTTI" || p.stato === filtroStato)
     );
   });
 
+  // ── Ordina ──────────────────────────────────────────────────────────────────
+  const getSortVal = (p, col) => {
+    if (col === "_padNome") return padroncini.find(x => x.id === p.padroncino_id)?.nome || "";
+    if (col === "_modello") return p.modello_custom || p.modello || "";
+    return p[col] ?? "";
+  };
+
+  const sorted = sortCol && sortDir
+    ? [...filtered].sort((a, b) => {
+        const va = getSortVal(a, sortCol);
+        const vb = getSortVal(b, sortCol);
+        const cmp = (typeof va === "number" && typeof vb === "number")
+          ? va - vb
+          : String(va).localeCompare(String(vb), "it");
+        return sortDir === "asc" ? cmp : -cmp;
+      })
+    : filtered;
+
   const padNome = (id) => padroncini.find(p => p.id === id)?.nome || "—";
+
+  // Colonne ordinabili
+  const COLS = [
+    { label: "Seriale / Modello",  col: "seriale" },
+    { label: "Stato",              col: "stato" },
+    { label: "Padroncino",         col: "_padNome" },
+    { label: "Tariffa",            col: "tariffa_mensile" },
+    { label: "Data Assegnazione",  col: "data_assegnazione" },
+    { label: "Fine",               col: "data_fine" },
+    { label: "",                   col: null },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.gap }}>
@@ -457,12 +558,29 @@ export const PalmariView = ({ palmari = [], padroncini = [], onSave, onDelete, o
         </button>
       </div>
 
-      {/* ── Tabella ── */}
+      {/* ── Tabella con sorting ── */}
       <TableWrapper>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <TheadRow headers={["Seriale / Modello", "Stato", "Padroncino", "Tariffa", "Data Assegnazione", "Fine", ""]} />
+          <thead>
+            <tr style={{ background: C.bgPage }}>
+              {COLS.map(({ label, col }) => (
+                <th
+                  key={label || "__act"}
+                  onClick={() => handleSort(col)}
+                  style={thSortStyle(col)}
+                >
+                  {label}
+                  {col && (
+                    <span style={{ opacity: sortCol === col ? 1 : 0.35, fontSize: 10 }}>
+                      {getSortIcon(col)}
+                    </span>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
-            {filtered.map((p, i) => {
+            {sorted.map((p, i) => {
               const sc    = statoStyle(p.stato);
               const rowBg = i % 2 === 0 ? C.white : C.bgRowAlt;
               return (
@@ -530,7 +648,7 @@ export const PalmariView = ({ palmari = [], padroncini = [], onSave, onDelete, o
                 </tr>
               );
             })}
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
                 <td colSpan={7} style={{ textAlign: "center", padding: "32px", color: C.fgSubtle, fontSize: TY.base_ }}>
                   Nessun palmare trovato
@@ -540,6 +658,19 @@ export const PalmariView = ({ palmari = [], padroncini = [], onSave, onDelete, o
           </tbody>
         </table>
       </TableWrapper>
+
+      {/* Footer */}
+      <div style={{ fontSize: TY.md, color: C.fgSubtle, textAlign: "right" }}>
+        {sorted.length} di {palmari.length} palmari
+        {sortCol && (
+          <button
+            onClick={() => { setSortCol(null); setSortDir(null); }}
+            style={{ marginLeft: 12, fontSize: TY.xs, color: ACCENT, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Reset ordinamento
+          </button>
+        )}
+      </div>
     </div>
   );
 };

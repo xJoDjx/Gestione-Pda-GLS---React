@@ -1168,7 +1168,8 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
                     return (
                       <RigaVoce
                         key={i}
-                        label={`⚡ Ricarica ${r.targa}${r.note?` — ${r.note}`:(r.descrizione?` — ${r.descrizione}`:"")}`}
+                        //label={`Ricarica ${r.targa}${r.note?` — ${r.note}`:(r.descrizione?` — ${r.descrizione}`:"")}`}
+                        label={`Ricarica Mezzo: ${r.targa}${r.note?` — ${r.note}`:("")}`}
                         value={parseFloat(((r.importo||0)*(1+rate)).toFixed(2))}
                         color="#0c4a6e" bg="#e0f2fe" accent="#7dd3fc" indent bold
                       />
@@ -1184,9 +1185,9 @@ export const ConteggiForm = ({ form, setForm, padroncino, mese, anno, giorni, on
                     return (
                       <RigaVoce
                         key={i}
-                        label={`${a.descrizione||"Addebito"}${a.conto_voce?` [${a.conto_voce}]`:""}`}
+                        label={`${a.descrizione||"Addebito"}${a.conto_voce?` [${a.conto_voce}]`:"" }${a.note?` — ${a.note }`:""}`}
                         value={parseFloat(((a.importo||0)*(1+rate)).toFixed(2))}
-                        nota={a.note}
+                        //nota={a.note}
                         color="#5b21b6" bg="#f5f3ff" accent="#c4b5fd" indent bold
                       />
                     );

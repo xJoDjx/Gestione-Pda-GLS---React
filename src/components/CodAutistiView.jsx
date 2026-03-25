@@ -1,22 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CodAutistiView.jsx  —  refactored con theme.js + sharedUI.jsx
+// CodAutistiView.jsx  — AGGIORNATO
 //
-// Cosa è cambiato rispetto all'originale:
-//   ✅ Rimossi: KpiCard, StoricoTabella, getAzStorico, fmtTs, STILE_AZ  (ora da sharedUI)
-//   ✅ Rimossi: tutti i colori/spacing hardcoded  (ora da theme)
-//   ✅ Inp → FormInput, Sel → FormSelect  (uniformi con le altre viste)
-//   ✅ STATO_STYLE locale rimosso  (ora da theme, + statoStyle() helper)
-//   ✅ Logica invariata al 100%
+// Novità rispetto all'originale:
+//   ✅ Salva → feedback visivo + chiude il dettaglio (come PalmariView)
+//   ✅ Pulsante "Duplica" nel dettaglio
+//   ✅ Controllo duplicati (codice già esistente)
+//   ✅ Ordinamento colonne nella lista (come MezziView)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
 import { Icon } from "./Icons";
 import { euro } from "../utils/formatters";
 
-// 1️⃣  Token di design — un solo file da toccare per cambiare l'aspetto
 import { C, SP, TY, BR, SH, statoStyle } from "./theme";
-
-// 2️⃣  Componenti condivisi — stessi componenti usati da Mezzi, Palmari, Padroncini
 import {
   KpiCard,
   FormInput,
@@ -31,13 +27,9 @@ import {
 
 // ─── COSTANTI ─────────────────────────────────────────────────────────────────
 const STATI = ["DISPONIBILE", "ASSEGNATO", "DISMESSO"];
-
-// Colore accent di questa vista (ambra). Usato su bottoni CTA e filtri attivi.
-const ACCENT = C.warningDot; // "#f59e0b"
-
+const ACCENT = C.warningDot;
 
 // ─── STORICO BUILDER ──────────────────────────────────────────────────────────
-// (logica pura, nessun token da usare qui)
 const TRACK = [
   ["codice",         "Codice"],
   ["stato",          "Stato"],
@@ -71,7 +63,6 @@ const buildStorico = (old, neo, pads = []) => {
     log.push({ ts, data, campo: label, da, a });
   });
 
-  // Traccia aggiunte/rimozioni documenti
   const docsOld = (old.documenti || []).map(d => d.nome || d.id).filter(Boolean);
   const docsNew = (neo.documenti || []).map(d => d.nome || d.id).filter(Boolean);
   docsNew.filter(n => !docsOld.includes(n)).forEach(n =>
@@ -83,7 +74,6 @@ const buildStorico = (old, neo, pads = []) => {
 
   return log;
 };
-
 
 // ─── HELPER FILE ──────────────────────────────────────────────────────────────
 const isElectron = typeof window !== "undefined" && !!window.electronAPI;
@@ -107,15 +97,25 @@ const salvaFile = async (d) => {
 
 
 // ─── DETTAGLIO CODICE AUTISTA ─────────────────────────────────────────────────
-const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => {
-  const [form, setForm] = useState({ ...autista });
-  const [tab,  setTab]  = useState("info");
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+const CodAutistaDetail = ({
+  autista,
+  padroncini,
+  tuttiCodici,       // ← lista completa per controllo duplicati
+  onSave,
+  onBack,
+  onDelete,
+  onDuplicate,       // ← nuovo
+}) => {
+  const [form, setForm]         = useState({ ...autista });
+  const [tab,  setTab]          = useState("info");
+  const [saved, setSaved]       = useState(false);   // ← feedback salvataggio
+  const [errDup, setErrDup]     = useState(false);   // ← errore duplicato
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); setErrDup(false); };
 
   const storico = form.storico   || [];
   const docs    = form.documenti || [];
   const padAss  = padroncini.find(p => p.id === form.padroncino_id);
-  const sc      = statoStyle(form.stato); // ← da theme, non più hardcoded
+  const sc      = statoStyle(form.stato);
 
   const handlePadChange = (pid) => setForm(f => ({
     ...f,
@@ -126,6 +126,18 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
   }));
 
   const handleSave = () => {
+    // ── Controllo duplicati ──────────────────────────────────────────────────
+    const codiceNorm = (form.codice || "").trim().toUpperCase();
+    const duplicato = tuttiCodici.some(a =>
+      a.id !== form.id &&
+      (a.codice || "").trim().toUpperCase() === codiceNorm &&
+      codiceNorm !== ""
+    );
+    if (duplicato) {
+      setErrDup(true);
+      return;
+    }
+
     const formFinal = {
       ...form,
       stato: form.padroncino_id
@@ -134,7 +146,7 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
     };
     const log   = buildStorico(autista, formFinal, padroncini);
     const saved = { ...formFinal, storico: [...storico, ...log] };
-    onSave(saved);
+    onSave(saved);   // ← il parent ora chiude il dettaglio
   };
 
   const addDoc = () => {
@@ -159,7 +171,6 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
   };
   const rmDoc = (id) => set("documenti", docs.filter(d => d.id !== id));
 
-  // Tab button — usa ACCENT di questa vista
   const TabBtn = ({ id, label }) => (
     <button
       onClick={() => setTab(id)}
@@ -229,7 +240,25 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
           </span>
         </div>
 
-        <div style={{ display: "flex", gap: SP.gapSm }}>
+        <div style={{ display: "flex", gap: SP.gapSm, alignItems: "center" }}>
+          {/* Errore duplicato */}
+          {errDup && (
+            <span style={{
+              fontSize: TY.sm, fontWeight: TY.bold, color: C.danger,
+              background: C.dangerBg, padding: "5px 12px",
+              borderRadius: BR.lg, border: `1px solid ${C.dangerBorder}`,
+            }}>
+              ⚠️ Codice già esistente
+            </span>
+          )}
+
+          {/* Feedback salvato */}
+          {saved && !errDup && (
+            <span style={{ fontSize: TY.sm, fontWeight: TY.bold, color: C.success }}>
+              ✓ Salvato
+            </span>
+          )}
+
           <button
             onClick={() => { if (window.confirm("Eliminare questo codice autista?")) onDelete(autista.id); }}
             style={{
@@ -245,6 +274,27 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
           >
             Elimina
           </button>
+
+          {/* ── Pulsante Duplica ── */}
+          {onDuplicate && (
+            <button
+              onClick={() => { if (window.confirm(`Duplicare il codice "${form.codice}"? Verrà creata una copia da completare.`)) onDuplicate(form); }}
+              style={{
+                display:      "flex", alignItems: "center", gap: 6,
+                padding:      "8px 14px",
+                borderRadius: BR.lg,
+                background:   C.bgPage,
+                border:       `1px solid ${C.border}`,
+                color:        C.fgMuted,
+                fontSize:     TY.md,
+                fontWeight:   TY.bold,
+                cursor:       "pointer",
+              }}
+            >
+              📋 Duplica
+            </button>
+          )}
+
           <button
             onClick={handleSave}
             style={{
@@ -275,7 +325,6 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
       {tab === "info" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
 
-          {/* Dati codice */}
           <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, padding: SP.cardPad }}>
             <div style={{ fontSize: TY.base_, fontWeight: TY.black, color: C.fg, marginBottom: 14 }}>👤 Dati Codice</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -301,7 +350,6 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
             </div>
           </div>
 
-          {/* Assegnazione */}
           <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, padding: SP.cardPad }}>
             <div style={{ fontSize: TY.base_, fontWeight: TY.black, color: C.fg, marginBottom: 14 }}>🔗 Assegnazione</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -405,7 +453,6 @@ const CodAutistaDetail = ({ autista, padroncini, onSave, onBack, onDelete }) => 
 
       {/* ══ STORICO ══ */}
       {tab === "storico" && (
-        // StoricoTabella viene da sharedUI — nessun codice duplicato
         <StoricoTabella
           storico={storico}
           entitaNome={form.codice}
@@ -433,33 +480,128 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
   const [filtroStato, setFiltroStato] = useState("TUTTI");
   const [detailId,    setDetailId]    = useState(null);
 
-  const detailAutista = detailId ? codAutisti.find(a => a.id === detailId) : null;
+  // ── Ordinamento colonne ─────────────────────────────────────────────────────
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState(null); // "asc" | "desc"
+
+  const handleSort = (col) => {
+    if (!col) return;
+    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortCol(null); setSortDir(null); }
+  };
+
+  const getSortIcon = (col) => {
+    if (sortCol !== col) return " ↕";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  };
+
+  const thSortStyle = (col) => ({
+    padding:       SP.cellLg,
+    textAlign:     "left",
+    fontSize:      TY.xs,
+    fontWeight:    TY.black,
+    color:         sortCol === col ? ACCENT : C.fgMuted,
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    borderBottom:  sortCol === col ? `2px solid ${ACCENT}` : `2px solid ${C.border}`,
+    whiteSpace:    "nowrap",
+    cursor:        col ? "pointer" : "default",
+    userSelect:    "none",
+  });
+
+  // ── Duplica codice ──────────────────────────────────────────────────────────
+  const handleDuplicate = (a) => {
+    const copy = {
+      ...a,
+      id:            `COD_${Date.now()}`,
+      codice:        "",          // l'utente deve inserire il nuovo codice
+      stato:         "DISPONIBILE",
+      padroncino_id: "",
+      storico:       [],
+      documenti:     [],
+      data_inizio:   "",
+      data_fine:     "",
+    };
+    onSave(copy, []);
+    setDetailId(copy.id);
+  };
+
+  const detailAutista = detailId ? (codAutisti.find(a => a.id === detailId) || null) : null;
 
   if (detailAutista) {
     return (
       <CodAutistaDetail
         autista={detailAutista}
         padroncini={padroncini}
+        tuttiCodici={codAutisti}
         onBack={() => setDetailId(null)}
-        onSave={a => { onSave(a); }}
+        onSave={a => {
+          onSave(a);
+          setDetailId(null);   // ← chiude il dettaglio dopo il salvataggio
+        }}
         onDelete={id => { onDelete(id); setDetailId(null); }}
+        onDuplicate={handleDuplicate}
       />
     );
   }
 
+  // ── Filtra (Ricerca Globale) ────────────────────────────────────────────────
   const filtered = codAutisti.filter(a => {
     const s = search.toLowerCase();
+    const padNome = padroncini.find(p => p.id === a.padroncino_id)?.nome || "";
+    
+    // Array di tutti i campi su cui cercare
+    const searchFields = [
+      a.codice,
+      a.stato,
+      padNome,
+      a.tariffa_fissa,
+      a.tariffa_ritiro,
+      a.target,
+      a.note
+    ].map(v => String(v ?? "").toLowerCase());
+
     return (
-      (!s || a.codice?.toLowerCase().includes(s) || a.note?.toLowerCase().includes(s)) &&
+      (!s || searchFields.some(f => f.includes(s))) &&
       (filtroStato === "TUTTI" || a.stato === filtroStato)
     );
   });
 
-  // Statistiche KPI
+  // ── Ordina ──────────────────────────────────────────────────────────────────
+  const getSortVal = (a, col) => {
+    if (col === "_padNome") return padroncini.find(p => p.id === a.padroncino_id)?.nome || "";
+    return a[col] ?? "";
+  };
+
+  const sorted = sortCol && sortDir
+    ? [...filtered].sort((a, b) => {
+        const va = getSortVal(a, sortCol);
+        const vb = getSortVal(b, sortCol);
+        const cmp = (typeof va === "number" && typeof vb === "number")
+          ? va - vb
+          : String(va).localeCompare(String(vb), "it");
+        return sortDir === "asc" ? cmp : -cmp;
+      })
+    : filtered;
+
+  // ── Statistiche KPI ─────────────────────────────────────────────────────────
   const assegnati    = codAutisti.filter(a => a.stato === "ASSEGNATO").length;
   const disponibili  = codAutisti.filter(a => a.stato === "DISPONIBILE").length;
   const tariffaMedia = codAutisti.length > 0 ? codAutisti.reduce((s, a) => s + (a.tariffa_fissa  || 0), 0) / codAutisti.length : 0;
   const ritiroMedio  = codAutisti.length > 0 ? codAutisti.reduce((s, a) => s + (a.tariffa_ritiro || 0), 0) / codAutisti.length : 0;
+
+  // Colonne ordinabili
+  const COLS = [
+    { label: "Codice",           col: "codice" },
+    { label: "Stato",            col: "stato" },
+    { label: "Padroncino",       col: "_padNome" },
+    { label: "Tariffa Fissa",    col: "tariffa_fissa" },
+    { label: "Tariffa Ritiro",   col: "tariffa_ritiro" },
+    { label: "Target",           col: "target" },
+    { label: "Note",             col: null },
+    { label: "",                 col: null },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: SP.gap }}>
@@ -495,13 +637,11 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
 
       {/* ── Filtri ── */}
       <div style={{ display: "flex", gap: SP.gapSm, alignItems: "center", flexWrap: "wrap" }}>
-        {/* SearchBar viene da sharedUI */}
         <SearchBar
           value={search}
           onChange={setSearch}
           placeholder="Cerca codice autista..."
         />
-        {/* FilterButton viene da sharedUI */}
         {["TUTTI", ...STATI].map(s => (
           <FilterButton
             key={s}
@@ -513,14 +653,30 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
         ))}
       </div>
 
-      {/* ── Tabella ── */}
-      {/* TableWrapper + TheadRow vengono da sharedUI */}
-      <TableWrapper>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <TheadRow headers={["Codice", "Stato", "Padroncino Assegnato", "Tariffa Fissa", "Tariffa Ritiro", "Target", "Note", ""]} />
+      {/* ── Tabella con sorting ── */}
+      <TableWrapper overflow="auto">
+        <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: C.bgPage }}>
+              {COLS.map(({ label, col }) => (
+                <th
+                  key={label || "__act"}
+                  onClick={() => handleSort(col)}
+                  style={thSortStyle(col)}
+                >
+                  {label}
+                  {col && (
+                    <span style={{ opacity: sortCol === col ? 1 : 0.35, fontSize: 10 }}>
+                      {getSortIcon(col)}
+                    </span>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
-            {filtered.map((a, i) => {
-              const sc     = statoStyle(a.stato); // ← da theme
+            {sorted.map((a, i) => {
+              const sc     = statoStyle(a.stato);
               const padAss = padroncini.find(p => p.id === a.padroncino_id);
               const rowBg  = i % 2 === 0 ? C.white : C.bgRowAlt;
 
@@ -582,6 +738,11 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
                         Dettagli
                       </button>
                       <button
+                        title="Duplica codice"
+                        onClick={e => { e.stopPropagation(); if (window.confirm(`Duplicare "${a.codice}"?`)) handleDuplicate(a); }}
+                        style={{ padding: "5px 8px", borderRadius: BR.md, background: C.bgPage, border: `1px solid ${C.border}`, color: C.fgMuted, fontSize: TY.sm, cursor: "pointer" }}
+                      >📋</button>
+                      <button
                         onClick={e => { e.stopPropagation(); if (window.confirm(`Eliminare ${a.codice}?`)) onDelete(a.id); }}
                         style={{ padding: "5px 8px", borderRadius: BR.md, background: C.dangerBgAlt, border: "none", color: C.danger, fontSize: TY.sm, cursor: "pointer" }}
                       >
@@ -593,7 +754,7 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
               );
             })}
 
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr>
                 <td colSpan={8} style={{ textAlign: "center", padding: "32px", color: C.fgSubtle, fontSize: TY.base_ }}>
                   Nessun codice autista trovato
@@ -606,7 +767,15 @@ export const CodAutistiView = ({ codAutisti = [], padroncini = [], onSave, onDel
 
       {/* Footer contatore */}
       <div style={{ fontSize: TY.md, color: C.fgSubtle, textAlign: "right" }}>
-        {filtered.length} di {codAutisti.length} codici autisti
+        {sorted.length} di {codAutisti.length} codici autisti
+        {sortCol && (
+          <button
+            onClick={() => { setSortCol(null); setSortDir(null); }}
+            style={{ marginLeft: 12, fontSize: TY.xs, color: ACCENT, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Reset ordinamento
+          </button>
+        )}
       </div>
 
     </div>

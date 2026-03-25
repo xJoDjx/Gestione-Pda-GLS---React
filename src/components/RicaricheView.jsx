@@ -1,26 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// RicaricheView.jsx  —  refactored con theme.js
+// RicaricheView.jsx  — AGGIORNATO
 //
-// Rimossi:
-//   ✅ Tutti i colori/spacing hardcoded → da theme (C, SP, TY, BR, SH)
-//
-// Tenuti locali (design specifico di questa vista):
-//   ⚙️  KpiCard  — ha icona ⚡ in cerchio, value a fontSize 28
-//   ⚙️  Card     — wrapper con header bar (usato solo qui)
-//   ⚙️  Field    — form field con label uppercase (usato solo qui)
-//   ⚙️  TextInput — input mono (usato solo qui)
-//
-// La logica CSV (parseRicaricheCSV, isJuice) è invariata.
+// Novità:
+//   ✅ Ordinamento colonne sulla tabella "Dettaglio per Targa"
+//      (Targa ↕ · Padroncino ↕ · kWh Int ↕ · kWh Ext ↕ · Costo Int ↕ · Costo Ext ↕ · Totale ↕ · Addebito ↕)
+//   ✅ Barra di ricerca per filtrare su Targa e Nome Padroncino/Autista
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useRef } from "react";
 import { euro, MESI } from "../utils/formatters";
 import { Icon } from "./Icons";
-
 import { C, SP, TY, BR, SH } from "./theme";
+import { SearchBar } from "./sharedUI";
 
 
-// ─── CSV PARSER (invariato) ───────────────────────────────────────────────────
+// ─── CSV PARSER ───────────────────────────────────────────────────────────────
 const isJuice = (stazione) => {
   const s = (stazione || "").toLowerCase();
   return s.includes("juice box") || s.includes("juice pole") || s.includes("juicebox") || s.includes("juicepole");
@@ -64,9 +58,7 @@ const parseRicaricheCSV = (text) => {
 };
 
 
-// ─── MINI COMPONENTS (specifici di questa vista) ─────────────────────────────
-
-// KPI card con icona ⚡ e valore grande mono
+// ─── MINI COMPONENTS ─────────────────────────────────────────────────────────
 const KpiCard = ({ label, value, sub }) => (
   <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 0, boxShadow: SH.card }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -78,7 +70,6 @@ const KpiCard = ({ label, value, sub }) => (
   </div>
 );
 
-// Card wrapper con header bar
 const Card = ({ title, icon, children, noPad }) => (
   <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, boxShadow: SH.card, overflow: "hidden" }}>
     <div style={{ padding: "11px 16px", display: "flex", alignItems: "center", gap: 7, borderBottom: `1px solid ${C.borderLight}`, background: C.bgRowAlt }}>
@@ -89,7 +80,6 @@ const Card = ({ title, icon, children, noPad }) => (
   </div>
 );
 
-// Form field con label uppercase
 const Field = ({ label, children }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: SP.gapXs }}>
     <label style={TY.labelStyle}>{label}</label>
@@ -97,32 +87,49 @@ const Field = ({ label, children }) => (
   </div>
 );
 
-// Input monospaziato pulito
 const TextInput = ({ style, ...props }) => (
   <input style={{
-    padding:      "9px 11px",
-    borderRadius: BR.lg,
-    border:       `1px solid ${C.border}`,
-    fontSize:     14,
-    fontFamily:   TY.mono,
-    fontWeight:   TY.semi,
-    background:   C.white,
-    outline:      "none",
-    color:        C.fg,
-    width:        "100%",
-    boxSizing:    "border-box",
-    ...style,
+    padding: "9px 11px", borderRadius: BR.lg, border: `1px solid ${C.border}`,
+    fontSize: 14, fontFamily: TY.mono, fontWeight: TY.semi, background: C.white,
+    outline: "none", color: C.fg, width: "100%", boxSizing: "border-box", ...style,
   }} {...props} />
 );
 
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese, anno, onSaveMezzo }) => {
+  const [search,    setSearch]    = useState("");
   const [selMese,   setSelMese]   = useState(mese);
   const [selAnno,   setSelAnno]   = useState(anno);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
   const fileRef = useRef();
+
+  // ── Ordinamento tabella targhe ─────────────────────────────────────────────
+  const [sortCol, setSortCol] = useState("targa");
+  const [sortDir, setSortDir] = useState("asc");
+
+  const handleSort = (col) => {
+    if (!col) return;
+    if (sortCol !== col) { setSortCol(col); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortCol(null); setSortDir(null); }
+  };
+  const getSortIcon = (col) => {
+    if (sortCol !== col) return " ↕";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  };
+  const thSortStyle = (col) => ({
+    padding: "11px 14px",
+    fontSize: TY.xs, fontWeight: TY.bold,
+    color: sortCol === col ? C.primaryMid : C.fgSubtle,
+    textTransform: "uppercase", letterSpacing: "0.07em",
+    borderBottom: `1px solid ${C.border}`,
+    whiteSpace: "nowrap", textAlign: col === "targa" || col === "padroncino" ? "left" : "right",
+    cursor: col ? "pointer" : "default",
+    userSelect: "none",
+    background: C.bgPage,
+  });
 
   const key      = `${selMese}_${selAnno}`;
   const meseData = ricariche[key] || { bolletta: 0, costo_esterno: 0, kwh_per_targa: {}, note: "" };
@@ -163,6 +170,55 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
     return { int: int_, ext: ext_, cInt, cExt, totale: parseFloat((cInt + cExt).toFixed(2)) };
   };
 
+  // ── FILTER & SORT della tabella targhe ──────────────────────────────────────
+  const filteredAndSorted = (() => {
+    const entries = Object.entries(meseData.kwh_per_targa || {});
+    
+    // Helper per determinare il nome da visualizzare (Aziendale/Autista o Padroncino)
+    const getPadName = (targa, vals) => {
+      const mz = (mezzi || []).find(m => (m.targa || "").toUpperCase() === targa.toUpperCase());
+      const isAz = mz?.categoria === "AUTO AZIENDALE";
+      const padId = vals.padroncino_id_snapshot || mz?.padroncino_id || "";
+      if (isAz) return mz?.autista || "Aziendale";
+      return (padroncini || []).find(p => p.id === padId)?.nome || "";
+    };
+
+    const q = search.toLowerCase();
+
+    // 1. Filtro
+    const filtered = entries.filter(([targa, vals]) => {
+      if (!q) return true;
+      const padNome = getPadName(targa, vals);
+      return targa.toLowerCase().includes(q) || padNome.toLowerCase().includes(q);
+    });
+
+    // 2. Ordinamento
+    return filtered.sort(([tA, vA], [tB, vB]) => {
+      const getAddebito = (targa, vals) => {
+        const mz   = (mezzi || []).find(m => (m.targa || "").toUpperCase() === targa.toUpperCase());
+        const isAz = mz?.categoria === "AUTO AZIENDALE";
+        const pct  = mz?.maggiorazione_ricarica_pct != null ? mz.maggiorazione_ricarica_pct : (isAz ? 0 : maggiPct);
+        const ci = (vals.interne || 0) * costoKwhInt;
+        const ce = (vals.esterne || 0) * costoExt;
+        return (ci + ce) * (1 + pct / 100);
+      };
+
+      let va, vb;
+      switch (sortCol) {
+        case "padroncino": va = getPadName(tA, vA); vb = getPadName(tB, vB); break;
+        case "kwh_int":   va = vA.interne  || 0;  vb = vB.interne  || 0; break;
+        case "kwh_ext":   va = vA.esterne  || 0;  vb = vB.esterne  || 0; break;
+        case "costo_int": { const rA=getRiga(tA), rB=getRiga(tB); va=rA.cInt; vb=rB.cInt; break; }
+        case "costo_ext": { const rA=getRiga(tA), rB=getRiga(tB); va=rA.cExt; vb=rB.cExt; break; }
+        case "totale":    { const rA=getRiga(tA), rB=getRiga(tB); va=rA.totale; vb=rB.totale; break; }
+        case "addebito":  va = getAddebito(tA, vA); vb = getAddebito(tB, vB); break;
+        default:          va = tA; vb = tB; // "targa"
+      }
+      const cmp = typeof va === "number" ? va - vb : String(va ?? "").localeCompare(String(vb ?? ""), "it");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  })();
+
   // ── CSV IMPORT ───────────────────────────────────────────────────────────────
   const handleFile = (file) => {
     if (!file) return;
@@ -199,7 +255,12 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
         <h1 style={{ margin: 0, fontSize: TY.xl, fontWeight: TY.black, color: C.fg, display: "flex", alignItems: "center", gap: SP.gapSm }}>
           ⚡ Ricariche Elettriche
         </h1>
-        <div style={{ display: "flex", gap: SP.gapSm }}>
+        <div style={{ display: "flex", gap: SP.gapSm, alignItems: "center" }}>
+          <SearchBar 
+            value={search} 
+            onChange={setSearch} 
+            placeholder="Cerca targa o padroncino..." 
+          />
           {[
             [selMese, MESI,                                          e => setSelMese(e.target.value)],
             [selAnno, [2023,2024,2025,2026,2027],                    e => setSelAnno(parseInt(e.target.value) || new Date().getFullYear())],
@@ -261,7 +322,6 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                   onChange={e => setMeseData({ kwh_fatturati_bolletta: parseFloat(e.target.value) || 0 })} />
               </Field>
 
-              {/* Pill costo kWh calcolato */}
               {costoKwhInt > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", borderRadius: BR.lg, background: C.primaryBg, border: `1px solid ${C.primaryBorder}` }}>
                   <span style={{ fontSize: TY.md, fontWeight: TY.semi, color: C.primaryMid }}>Costo kWh Interno</span>
@@ -366,8 +426,8 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
               <div style={{
                 marginTop: 12, padding: "9px 13px", borderRadius: BR.lg,
                 fontSize:   TY.md, fontWeight: TY.semi,
-                background: importMsg.type === "success" ? C.successBgAlt : importMsg.type === "warn" ? C.warningBgAlt : C.dangerBgAlt,
-                color:      importMsg.type === "success" ? C.success       : importMsg.type === "warn" ? C.warning      : C.danger,
+                background: importMsg.type === "success" ? "#dcfce7" : importMsg.type === "warn" ? C.warningBgAlt : C.dangerBgAlt,
+                color:      importMsg.type === "success" ? C.success  : importMsg.type === "warn" ? C.warning      : C.danger,
                 border:     `1px solid ${importMsg.type === "success" ? C.successDot : importMsg.type === "warn" ? C.warningBorder : C.dangerDot}`,
               }}>
                 {importMsg.type === "success" ? "✅" : importMsg.type === "warn" ? "⚠️" : "❌"} {importMsg.text}
@@ -390,43 +450,60 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
             </div>
           ) : (
             <div style={{ background: C.white, borderRadius: BR.card, border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: SH.card }}>
-              {/* Card header */}
-              <div style={{ padding: "11px 18px", borderBottom: `1px solid ${C.borderLight}`, background: C.bgRowAlt, display: "flex", alignItems: "center", gap: 7 }}>
-                <span style={{ fontSize: 14, opacity: 0.8 }}>⚡</span>
-                <span style={{ fontSize: TY.sm, fontWeight: TY.black, color: C.fg, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Dettaglio per Targa — {numTarghe} veicoli
+              {/* Card header con info ordinamento */}
+              <div style={{ padding: "11px 18px", borderBottom: `1px solid ${C.borderLight}`, background: C.bgRowAlt, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontSize: 14, opacity: 0.8 }}>⚡</span>
+                  <span style={{ fontSize: TY.sm, fontWeight: TY.black, color: C.fg, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Dettaglio per Targa — {numTarghe} veicoli
+                  </span>
+                </div>
+                <span style={{ fontSize: TY.xs, color: C.fgSubtle }}>
+                  Clicca intestazione colonna per ordinare ↕
+                  {sortCol && (
+                    <button
+                      onClick={() => { setSortCol("targa"); setSortDir("asc"); }}
+                      style={{ marginLeft: 10, fontSize: TY.xs, color: C.primaryMid, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Reset
+                    </button>
+                  )}
                 </span>
               </div>
 
-              {/* Tabella */}
+              {/* Tabella con colonne ordinabili */}
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
                   <thead>
-                    <tr style={{ background: C.bgPage }}>
+                    <tr>
                       {[
-                        { label: "Targa",      w: 110, align: "left"   },
-                        { label: "Padroncino", w: 160, align: "left"   },
-                        { label: "kWh Int.",   w: 90,  align: "right"  },
-                        { label: "kWh Ext.",   w: 90,  align: "right"  },
-                        { label: "Costo Int.", w: 110, align: "right"  },
-                        { label: "Costo Ext.", w: 110, align: "right"  },
-                        { label: "Totale",     w: 110, align: "right"  },
-                        { label: "Magg.",      w: 80,  align: "center" },
-                        { label: "Addebito",   w: 110, align: "right"  },
+                        { label: "Targa",      col: "targa",      align: "left"   },
+                        { label: "Padroncino", col: "padroncino", align: "left"   },
+                        { label: "kWh Int.",   col: "kwh_int",    align: "right"  },
+                        { label: "kWh Ext.",   col: "kwh_ext",    align: "right"  },
+                        { label: "Costo Int.", col: "costo_int",  align: "right"  },
+                        { label: "Costo Ext.", col: "costo_ext",  align: "right"  },
+                        { label: "Totale",     col: "totale",     align: "right"  },
+                        { label: "Magg.",      col: null,         align: "center" },
+                        { label: "Addebito",   col: "addebito",   align: "right"  },
                       ].map(col => (
-                        <th key={col.label} style={{
-                          padding: "11px 14px", fontSize: TY.xs, fontWeight: TY.bold,
-                          color: C.fgSubtle, textTransform: "uppercase", letterSpacing: "0.07em",
-                          borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap",
-                          textAlign: col.align, width: col.w,
-                        }}>{col.label}</th>
+                        <th
+                          key={col.label}
+                          onClick={() => handleSort(col.col)}
+                          style={{ ...thSortStyle(col.col), textAlign: col.align }}
+                        >
+                          {col.label}
+                          {col.col && (
+                            <span style={{ opacity: sortCol === col.col ? 1 : 0.35, fontSize: 9, marginLeft: 2 }}>
+                              {getSortIcon(col.col)}
+                            </span>
+                          )}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(meseData.kwh_per_targa || {})
-                      .sort((a, b) => a[0].localeCompare(b[0]))
-                      .map(([targa, vals], ri) => {
+                    {filteredAndSorted.map(([targa, vals], ri) => {
                         const r             = getRiga(targa);
                         const mz            = (mezzi || []).find(m => (m.targa || "").toUpperCase() === targa);
                         const padIdStorico  = vals.padroncino_id_snapshot || mz?.padroncino_id || "";
@@ -463,7 +540,6 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                                     : <span style={{ color: C.fgSubtle, fontStyle: "italic" }}>—</span>
                                 }
                               </div>
-                              {/* Input maggiorazione per-mezzo */}
                               {mz && onSaveMezzo && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
                                   <input type="number" min="0" max="200" step="1"
@@ -498,31 +574,31 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                               <div style={{ fontSize: TY.xxs, color: C.fgSubtle }}>{vals.sessioni_ext || 0} sess.</div>
                             </td>
 
-                            {/* COSTO INT — blu */}
+                            {/* COSTO INT */}
                             <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                               <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.bold, color: C.primaryMid }}>{euro(r.cInt)} €</span>
                             </td>
 
-                            {/* COSTO EXT — amber */}
+                            {/* COSTO EXT */}
                             <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                               {costoExt > 0
                                 ? <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.bold, color: C.warningMid }}>{euro(r.cExt)} €</span>
                                 : <span style={{ color: "#cbd5e1", fontSize: TY.sm }}>—</span>}
                             </td>
 
-                            {/* TOTALE — verde */}
+                            {/* TOTALE */}
                             <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                               <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.successMid }}>{euro(r.totale)} €</span>
                             </td>
 
-                            {/* MAGG — badge pill blu */}
+                            {/* MAGG */}
                             <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "center" }}>
                               {hasMagg
                                 ? <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 999, background: C.primaryBgAlt, color: C.primarySoft, fontSize: TY.sm, fontWeight: TY.bold, fontFamily: TY.mono, whiteSpace: "nowrap" }}>+{pctEff}%</span>
                                 : <span style={{ color: "#cbd5e1", fontSize: TY.sm }}>—</span>}
                             </td>
 
-                            {/* ADDEBITO — viola */}
+                            {/* ADDEBITO */}
                             <td style={{ padding: "5px 14px", borderBottom: `1px solid ${C.borderLight}`, textAlign: "right" }}>
                               {hasMagg
                                 ? <span style={{ fontFamily: TY.mono, fontSize: TY.base_, fontWeight: TY.black, color: C.violetSoft }}>{euro(addebito)} €</span>
@@ -532,7 +608,7 @@ export const RicaricheView = ({ ricariche, onSave, mezzi, padroncini = [], mese,
                         );
                       })}
 
-                    {/* ── RIGA TOTALI ── */}
+                    {/* RIGA TOTALI */}
                     <tr style={{ background: C.bgPage }}>
                       <td colSpan={2} style={{ padding: "13px 14px", fontSize: TY.sm, fontWeight: TY.black, color: C.fg, borderTop: `2px solid ${C.border}`, letterSpacing: "0.04em" }}>TOTALE</td>
                       <td style={{ padding: "13px 14px", fontFamily: TY.mono, fontSize: TY.md, fontWeight: TY.bold, textAlign: "right", color: C.fg,         borderTop: `2px solid ${C.border}` }}>{totKwhInt.toFixed(1)}</td>
